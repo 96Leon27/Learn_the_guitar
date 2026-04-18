@@ -94,7 +94,7 @@ class Learn_The_Guitar(QMainWindow, MainWindow):
             ("Да", "Нет"), 0, False)
 
         if ok_pressed and res == 'Да':
-            sys.exit(app.exec())
+            app.quit()
 
     # основная функция приложения
     def run(self):
@@ -398,27 +398,32 @@ class practice_screen(QMainWindow, PracticeWindow):
             pg.mixer.music.pause()
 
     def plus_time(self):
-        if not self.audio_loaded:
-            return
-        cur_pos = pg.mixer.music.get_pos() / 1000
-        self.start_pos += cur_pos + 5
-        if self.start_pos > self.song_length:
-            self.start_pos = 0
-        pg.mixer.music.play(0, self.start_pos, 0)
-        if not self.play:
-            pg.mixer.music.pause()
+        if (not self.audio_loaded): return
+
+        cur_rel_pos = pg.mixer.music.get_pos() / 1000.0
+        new_abs_pos = self.start_pos + cur_rel_pos + 5
+
+        if (new_abs_pos > self.song_length): new_abs_pos = self.song_length
+
+        self.start_pos = new_abs_pos
+        pg.mixer.music.play(0, self.start_pos)
+
+        if (not self.play): pg.mixer.music.pause()
         self.statusBar().showMessage("⏩ +5 секунд", 1000)
 
+
     def minus_time(self):
-        if not self.audio_loaded:
-            return
-        cur_pos = pg.mixer.music.get_pos() / 1000
-        self.start_pos += cur_pos - 5
-        if self.start_pos < 0:
-            self.start_pos = 0
-        pg.mixer.music.play(0, self.start_pos, 0)
-        if not self.play:
-            pg.mixer.music.pause()
+        if (not self.audio_loaded): return
+
+        cur_rel_pos = pg.mixer.music.get_pos() / 1000.0
+        new_abs_pos = self.start_pos + cur_rel_pos - 5
+
+        if (new_abs_pos < 0): new_abs_pos = 0
+
+        self.start_pos = new_abs_pos
+        pg.mixer.music.play(0, self.start_pos)
+
+        if (not self.play): pg.mixer.music.pause()
         self.statusBar().showMessage("⏪ -5 секунд", 1000)
 
 
