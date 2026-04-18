@@ -3,7 +3,7 @@ import sqlite3
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QApplication, QMainWindow, QInputDialog, QTableWidgetItem, QHeaderView
 from PyQt6.QtGui import QPainter, QColor, QIcon
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt, pyqtSignal
 import pygame as pg
 import math as m
 
@@ -186,16 +186,6 @@ class choose_screen(QMainWindow, ChooseWindow):
         except sqlite3.Error as e:            
             self.statusBar().showMessage(F"Ошибка: {e}")
 
-    # def run(self):
-    #     cur = self.con.cursor()
-    #     result = cur.execute(f"""SELECT * FROM Tracks""").fetchall()
-    #     if 1 <= int(self.song_id.text()) <= len(result):
-    #         self.statusBar().showMessage(f"Запуск трека")
-    #         self.ex = practice_screen(self.song_id.text())
-    #         self.ex.show()
-    #     else:
-    #         self.statusBar().showMessage(f"Трека с таким id нет в базе данных")
-
     def run(self):
         try:
             song_id = int(self.song_id.text())
@@ -215,6 +205,24 @@ class choose_screen(QMainWindow, ChooseWindow):
                 self.statusBar().showMessage("Трека с таким ID нет в базе данных", 3000)
         except sqlite3.Error as e:
             self.statusBar().showMessage(f"Ошибка БД: {e}", 3000)
+
+class ClickableProgressBar(QtWidgets.QProgressBar):
+    clicked = pyqtSignal(int)
+
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        width = self.width()
+
+        if (width > 0):
+            x = event.position().x() if hasattr(event, 'position') else event.x()
+            ratio = x / width
+            value = int(ratio * self.maximum())
+            self.setValue(value)
+            self.clicked.emit(value)
+        super().mousePressEvent(event)
 
 class practice_screen(QMainWindow, PracticeWindow):
     def animation_button(self, button):
@@ -323,16 +331,33 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.show_battle()
         self.show_accords()
 
+    def seek_to_position(self, value_msec):
+        if (not self.audio_loaded): return
+
+        new_pos_sec = value_msec / 1000.0
+
+        if (new_pos_sec < 0): new_pos_sec = 0
+        if (new_pos_sec > self.song_length): new_pos_sec = self.song_length
+
+        self.start_pos = new_pos_sec
+        pg.mixer.music.play(0, self.start_pos)
+
+        if (not self.play): pg.mixer.music.pause()
+
+        minutes = int(new_pos_sec // 60)
+        seconds = int(new_pos_sec % 60)
+        self.statusBar().showMessage(f"Перемотка на {minutes}:{seconds:02d}", 1000)
+
     def setup_progress_bar(self):
-        self.progress_bar = QtWidgets.QProgressBar(self.centralwidget)
+        self.progress_bar = ClickableProgressBar(self.centralwidget)
         self.progress_bar.setGeometry(QtCore.QRect(10, 380, 780, 20))
         self.progress_bar.setRange(0, int(self.song_length * 1000))
         self.progress_bar.setValue(0)
+        self.progress_bar.clicked.connect(self.seek_to_position) 
 
         self.time_label = QtWidgets.QLabel(self.centralwidget)
         self.time_label.setGeometry(QtCore.QRect(10, 405, 100, 20))
         self.time_label.setText("0:00")
-
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_progress)
