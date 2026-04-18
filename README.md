@@ -75,3 +75,9 @@ Learn_the_guitar/
 ├── requirements.txt  # зависимости
 └── README.md
 ```
+
+## Технологии 
+- Python 3.12
+- PyQt6 - GUI framework
+- pygame - аудивоспроизведение
+- SQLite - база данных
