@@ -201,6 +201,12 @@ class choose_screen(QMainWindow, ChooseWindow):
 
 
 class practice_screen(QMainWindow, PracticeWindow):
+    def animation_button(self, button):
+            original_style = button.styleSheet()
+            button.setStyleSheet("background-color: #1E90FF;")
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: button.setStyleSheet(original_style))
+
 
     def __init__(self, song_id):
         super(practice_screen, self).__init__()
@@ -258,14 +264,18 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.accords_text.setReadOnly(True)
 
         # функционал кнопок
-        self.show_battle_button.clicked.connect(self.show_battle)
-        self.show_accords_button.clicked.connect(self.show_accords)
-        self.hide_battle_button.clicked.connect(self.hide_battle)
-        self.hide_accords_button.clicked.connect(self.hide_accords)
-        self.back_button.clicked.connect(self.back_to_choice)
-        self.pause_button.clicked.connect(self.pause_play)
-        self.plus_button.clicked.connect(self.plus_time)
-        self.minus_button.clicked.connect(self.minus_time)
+        # функционал кнопок с анимацией
+        self.show_battle_button.clicked.connect(lambda: [self.animation_button(self.show_battle_button), self.show_battle()])
+        self.show_accords_button.clicked.connect(lambda: [self.animation_button(self.show_accords_button), self.show_accords()])
+
+        self.hide_battle_button.clicked.connect(lambda: [self.animation_button(self.hide_battle_button), self.hide_battle()])
+        self.hide_accords_button.clicked.connect(lambda: [self.animation_button(self.hide_accords_button), self.hide_accords()])
+
+        self.back_button.clicked.connect(lambda: [self.animation_button(self.back_button), self.back_to_choice()])
+        self.pause_button.clicked.connect(lambda: [self.animation_button(self.pause_button), self.pause_play()])
+
+        self.plus_button.clicked.connect(lambda: [self.animation_button(self.plus_button), self.plus_time()])
+        self.minus_button.clicked.connect(lambda: [self.animation_button(self.minus_button), self.minus_time()])
 
         # функционал слайдеров
         self.sound_slider.valueChanged.connect(self.change_volume)
