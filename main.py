@@ -149,45 +149,42 @@ class choose_screen(QMainWindow, ChooseWindow):
 
     def filter(self):
         cur = self.con.cursor()
-        # Получили результат запроса, который ввели в текстовое поле
-        result = cur.execute(f"""
-        SELECT * FROM Tracks
-        WHERE {self.alph[self.search_filter.currentText()]} LIKE '%{self.search_line.text().capitalize()}%' OR 
-              {self.alph[self.search_filter.currentText()]} LIKE '%{self.search_line.text().lower()}%';
-        """).fetchall()
+        search_text = self.search_line.text().strip()
+        column = self.alph.get(self.search_filter.currentText())
 
-        # Заполнили размеры таблицы
-        self.tableWidget.setRowCount(len(result))
-        # Если запись не нашлась, то оповестим это в статусбаре
-        if not result:
-            self.statusBar().showMessage('Ничего не нашлось')
-            return
-        else:
-            # ставим в правильную форму слова в статусбаре
-            n = len(result)
-            if n % 10 == 1:
-                self.statusBar().showMessage(f"Нашелся {len(result)} трек")
-            elif n % 10 == 2 or n % 10 == 3 or n % 10 == 4:
-                self.statusBar().showMessage(f"Нашлось {len(result)} трека")
+        if (not column):
+            self.statusBar().showMessage("Error: Choose category for search")
+            return 
+        try:
+            if (not search_text):
+                result = cur.execute("SELECT * FROM Tracks").fetchall()
             else:
-                self.statusBar().showMessage(f"Нашлось {len(result)} треков")
+                query = f"SELECT * FROM Tracks WHERE {column} LIKE ?"
+                search_pattern = f"%{search_text}%"
+                result = cur.execute(query, (search_pattern,)).fetchall()
+            
+            self.tableWidget.setRowCount(len(result))
 
-        # добавляем удобные для понимая заголовки и заполняем таблицу
-        self.titles = ['Id', 'Исполнитель', 'Название трека', 'Продолжительность', 'Сложность']
-        self.tableWidget.setRowCount(len(result))
-        self.tableWidget.setColumnCount(len(result[0]))
-        self.tableWidget.setHorizontalHeaderLabels(self.titles)
-        for i, elem in enumerate(result):
-            for j, val in enumerate(elem):
-                self.tableWidget.setItem(i, j, QTableWidgetItem(str(val)))
+            if (not result):
+                self.statusBar().showMessage("Nothing found")
+                return
 
-        # регулируем ширину столбцов
-        header = self.tableWidget.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+            for i, elem in enumerate(result):
+                for j, val in enumerate(elem):
+                    self.tableWidget.setItem(i, j, QTableWidgetItem(str(val)))
+
+            # Настройка ширины столбцов
+            header = self.tableWidget.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+
+            self.statusBar().showMessage(f"Нашел {len(result)} треков")
+
+        except sqlite3.Error as e:            
+            self.statusBar().showMessage(F"Ошибка: {e}")
 
     def run(self):
         cur = self.con.cursor()
@@ -211,6 +208,7 @@ class practice_screen(QMainWindow, PracticeWindow):
     def __init__(self, song_id):
         super(practice_screen, self).__init__()
         self.setupUi(self)
+        self.audio_loaded = False
 
         # соберём данные с песни
         with open(f'songs_texts/{song_id}.txt', encoding='utf-8') as file:
@@ -233,6 +231,7 @@ class practice_screen(QMainWindow, PracticeWindow):
         # загружаем трек
         pg.mixer.init(22100)
         pg.mixer.music.load(f'songs_audios/{song_id}.mp3')
+        self.audio_loaded = True
         pg.mixer.music.set_volume(0.5)
         pg.mixer.music.play()
         pg.mixer.music.pause()
@@ -245,8 +244,8 @@ class practice_screen(QMainWindow, PracticeWindow):
         res = cur.execute(f"""
         SELECT duration FROM Tracks
         WHERE id = '{song_id}'""").fetchall()
-        self.song_lenth = res[0][0].split(':')
-        self.song_lenth = int(self.song_lenth[0]) * 60 + int(self.song_lenth[1])
+        self.song_length = res[0][0].split(':')
+        self.song_length = int(self.song_length[0]) * 60 + int(self.song_length[1])
         # print(self.song_lenth)
 
         # запускаем основную иницилизацию
@@ -302,16 +301,20 @@ class practice_screen(QMainWindow, PracticeWindow):
 
     # вернуться к выбору трека
     def back_to_choice(self):
-        pg.mixer.music.stop()
+        if self.audio_loaded: pg.mixer.music.stop()
         self.close()
 
     def change_volume(self):
+        if (not self.audio_loaded): return
         pg.mixer.music.set_volume(self.sound_slider.value() / 100)
-        # print(pg.mixer.music.get_volume())
+
 
     def pause_play(self):
+        if (not self.audio_loaded): return
+
         self.play = not self.play
-        if self.play:
+
+        if (self.play):
             self.pause_button.setText('⏸')
             pg.mixer.music.unpause()
         else:
@@ -320,37 +323,40 @@ class practice_screen(QMainWindow, PracticeWindow):
 
     # перемотка вперед
     def plus_time(self):
+        if (not self.audio_loaded): return
+
         # текущее место в треке в секундах
         cur_pos = pg.mixer.music.get_pos() / 1000
 
         # от момента начала + сколько прошло + 5 сек
         self.start_pos += cur_pos + 5
 
-        # если больше длины самого трека, то он начинается с начала
-        if self.start_pos > self.song_lenth:
-            self.start_pos = 0
+        if (self.start_pos > self.song_length): self.start_pos = 0
+        
         pg.mixer.music.play(0, self.start_pos, 0)
+        
+        if (not self.play): pg.mixer.music.pause()
 
-        # если на паузе, то не играем
-        if not self.play:
-            pg.mixer.music.pause()
+        self.statusBar().showMessage("⏩ +5 секунд", 1000)
 
-    # перемотку назад
+
+    # перемотка назад
     def minus_time(self):
+        if (not self.audio_loaded): return
+        
         # текущее место в треке в секундах
         cur_pos = pg.mixer.music.get_pos() / 1000
 
         # от момента начала + сколько прошло - 5 сек
         self.start_pos += cur_pos - 5
 
-        # если результат меньше нуля (трек начинается с отрицательной секунды), то начинать трек с 0
-        if self.start_pos < 0:
-            self.start_pos = 0
+        if (self.start_pos < 0): self.start_pos = 0
+
         pg.mixer.music.play(0, self.start_pos, 0)
 
-        # если на паузе, то не играем
-        if not self.play:
-            pg.mixer.music.pause()
+        if (not self.play): pg.mixer.music.pause()
+        
+        self.statusBar().showMessage("⏪ -5 секунд", 1000)
 
 
 if __name__ == '__main__':
