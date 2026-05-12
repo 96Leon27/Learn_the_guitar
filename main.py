@@ -1,5 +1,6 @@
 import sys
 import sqlite3
+from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QApplication, QMainWindow, QInputDialog, QTableWidgetItem, QHeaderView
 from PyQt6.QtGui import QPainter, QColor, QIcon
 from PyQt6.QtCore import QPointF
@@ -93,7 +94,7 @@ class Learn_The_Guitar(QMainWindow, MainWindow):
             ("Да", "Нет"), 0, False)
 
         if ok_pressed and res == 'Да':
-            sys.exit(app.exec())
+            app.quit()
 
     # основная функция приложения
     def run(self):
@@ -102,7 +103,6 @@ class Learn_The_Guitar(QMainWindow, MainWindow):
 
 
 class choose_screen(QMainWindow, ChooseWindow):
-
     def __init__(self):
         super(choose_screen, self).__init__()
         self.setupUi(self)
@@ -149,157 +149,246 @@ class choose_screen(QMainWindow, ChooseWindow):
 
     def filter(self):
         cur = self.con.cursor()
-        # Получили результат запроса, который ввели в текстовое поле
-        result = cur.execute(f"""
-        SELECT * FROM Tracks
-        WHERE {self.alph[self.search_filter.currentText()]} LIKE '%{self.search_line.text().capitalize()}%' OR 
-              {self.alph[self.search_filter.currentText()]} LIKE '%{self.search_line.text().lower()}%';
-        """).fetchall()
+        search_text = self.search_line.text().strip()
+        column = self.alph.get(self.search_filter.currentText())
 
-        # Заполнили размеры таблицы
-        self.tableWidget.setRowCount(len(result))
-        # Если запись не нашлась, то оповестим это в статусбаре
-        if not result:
-            self.statusBar().showMessage('Ничего не нашлось')
-            return
-        else:
-            # ставим в правильную форму слова в статусбаре
-            n = len(result)
-            if n % 10 == 1:
-                self.statusBar().showMessage(f"Нашелся {len(result)} трек")
-            elif n % 10 == 2 or n % 10 == 3 or n % 10 == 4:
-                self.statusBar().showMessage(f"Нашлось {len(result)} трека")
+        if (not column):
+            self.statusBar().showMessage("Error: Choose category for search")
+            return 
+        try:
+            if (not search_text):
+                result = cur.execute("SELECT * FROM Tracks").fetchall()
             else:
-                self.statusBar().showMessage(f"Нашлось {len(result)} треков")
+                query = f"SELECT * FROM Tracks WHERE {column} LIKE ?"
+                search_pattern = f"%{search_text}%"
+                result = cur.execute(query, (search_pattern,)).fetchall()
+            
+            self.tableWidget.setRowCount(len(result))
 
-        # добавляем удобные для понимая заголовки и заполняем таблицу
-        self.titles = ['Id', 'Исполнитель', 'Название трека', 'Продолжительность', 'Сложность']
-        self.tableWidget.setRowCount(len(result))
-        self.tableWidget.setColumnCount(len(result[0]))
-        self.tableWidget.setHorizontalHeaderLabels(self.titles)
-        for i, elem in enumerate(result):
-            for j, val in enumerate(elem):
-                self.tableWidget.setItem(i, j, QTableWidgetItem(str(val)))
+            if (not result):
+                self.statusBar().showMessage("Nothing found")
+                return
 
-        # регулируем ширину столбцов
-        header = self.tableWidget.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+            for i, elem in enumerate(result):
+                for j, val in enumerate(elem):
+                    self.tableWidget.setItem(i, j, QTableWidgetItem(str(val)))
+
+            # Настройка ширины столбцов
+            header = self.tableWidget.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+
+            self.statusBar().showMessage(f"Нашел {len(result)} треков")
+
+        except sqlite3.Error as e:            
+            self.statusBar().showMessage(F"Ошибка: {e}")
+
+    # def run(self):
+    #     cur = self.con.cursor()
+    #     result = cur.execute(f"""SELECT * FROM Tracks""").fetchall()
+    #     if 1 <= int(self.song_id.text()) <= len(result):
+    #         self.statusBar().showMessage(f"Запуск трека")
+    #         self.ex = practice_screen(self.song_id.text())
+    #         self.ex.show()
+    #     else:
+    #         self.statusBar().showMessage(f"Трека с таким id нет в базе данных")
 
     def run(self):
-        cur = self.con.cursor()
-        result = cur.execute(f"""SELECT * FROM Tracks""").fetchall()
-        if 1 <= int(self.song_id.text()) <= len(result):
-            self.statusBar().showMessage(f"Запуск трека")
-            self.ex = practice_screen(self.song_id.text())
-            self.ex.show()
-        else:
-            self.statusBar().showMessage(f"Трека с таким id нет в базе данных")
+        try:
+            song_id = int(self.song_id.text())
+        except ValueError:
+            self.statusBar().showMessage("Ошибка: ID должен быть числом", 3000)
+            return 
+        
+        try:
+            cur = self.con.cursor()
+            result = cur.execute("SELECT * FROM Tracks").fetchall()
 
+            if (1 <= song_id <= len(result)):
+                self.statusBar().showMessage("Запуск трека")
+                self.ex = practice_screen(str(song_id))
+                self.ex.show()
+            else:
+                self.statusBar().showMessage("Трека с таким ID нет в базе данных", 3000)
+        except sqlite3.Error as e:
+            self.statusBar().showMessage(f"Ошибка БД: {e}", 3000)
 
 class practice_screen(QMainWindow, PracticeWindow):
+    def animation_button(self, button):
+        original_style = button.styleSheet()
+        button.setStyleSheet("background-color: #1E90FF;")
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: button.setStyleSheet(original_style))
 
     def __init__(self, song_id):
         super(practice_screen, self).__init__()
         self.setupUi(self)
-
-        # соберём данные с песни
-        with open(f'songs_texts/{song_id}.txt', encoding='utf-8') as file:
-            self.song_text.setPlainText(file.read())
-        with open(f'songs_settings/{song_id}.txt', encoding='utf-8') as file:
-            text = file.readlines()
-
-        # данные о бое
-        with open(f'battle/{text[0].strip()}.txt', encoding='utf-8') as file:
-            self.battle = file.readline()
-        # print(self.battle)
-
-        # данный об аккордах
-        self.accords = []
-        for accord in text[1].split():
-            with open(f'accords/{accord}.txt', encoding='utf-8') as file:
-                self.accords.append(file.read())
-        # print(*self.accords, sep='\n')
-
-        # загружаем трек
-        pg.mixer.init(22100)
-        pg.mixer.music.load(f'songs_audios/{song_id}.mp3')
-        pg.mixer.music.set_volume(0.5)
-        pg.mixer.music.play()
-        pg.mixer.music.pause()
+        self.audio_loaded = False
         self.play = False
         self.start_pos = 0
+        self.song_id = song_id
 
-        # длинна песни
-        con = sqlite3.connect("tracks.sqlite")
-        cur = con.cursor()
-        res = cur.execute(f"""
-        SELECT duration FROM Tracks
-        WHERE id = '{song_id}'""").fetchall()
-        self.song_lenth = res[0][0].split(':')
-        self.song_lenth = int(self.song_lenth[0]) * 60 + int(self.song_lenth[1])
-        # print(self.song_lenth)
+        # Текст
+        try:
+            with open(f'songs_texts/{song_id}.txt', encoding='utf-8') as file:
+                self.song_text.setPlainText(file.read())
+        except FileNotFoundError:
+            self.song_text.setPlainText("[Текст песни не найден]")
+        except Exception as e:
+            self.song_text.setPlainText(f"[Ошибка: {e}]")
 
-        # запускаем основную иницилизацию
+        # Настройки (бой и аккорды) 
+        battle_file = None
+        accords_list = []
+        try:
+            with open(f'songs_settings/{song_id}.txt', encoding='utf-8') as file:
+                lines = file.readlines()
+            if len(lines) >= 2:
+                battle_file = lines[0].strip()
+                accords_list = lines[1].split()
+        except FileNotFoundError:
+            self.statusBar().showMessage("Файл настроек не найден", 3000)
+        except Exception as e:
+            self.statusBar().showMessage(f"Ошибка настроек: {e}", 3000)
+
+        # Бой
+        self.battle = ""
+        if battle_file:
+            try:
+                with open(f'battle/{battle_file}.txt', encoding='utf-8') as file:
+                    self.battle = file.readline().strip()
+            except FileNotFoundError:
+                self.battle = "[Бой не найден]"
+
+        # Аккорды
+        self.accords = []
+        for accord in accords_list:
+            try:
+                with open(f'accords/{accord}.txt', encoding='utf-8') as file:
+                    self.accords.append(file.read())
+            except FileNotFoundError:
+                self.accords.append(f"[Аккорд {accord} не найден]")
+
+        # Аудио
+        try:
+            pg.mixer.init(22100)
+            pg.mixer.music.load(f'songs_audios/{song_id}.mp3')
+            pg.mixer.music.set_volume(0.5)
+            pg.mixer.music.play()
+            pg.mixer.music.pause()
+            self.audio_loaded = True
+        except pg.error as e:
+            self.statusBar().showMessage(f"Не удалось загрузить аудио: {e}", 3000)
+
+        # Длительность трека
+        self.song_length = 0
+        try:
+            con = sqlite3.connect("tracks.sqlite")
+            cur = con.cursor()
+            res = cur.execute("SELECT duration FROM Tracks WHERE id = ?", (song_id,)).fetchall()
+            if res:
+                dur_parts = res[0][0].split(':')
+                self.song_length = int(dur_parts[0]) * 60 + int(dur_parts[1])
+            con.close()
+        except Exception as e:
+            self.statusBar().showMessage(f"Ошибка получения длительности: {e}", 3000)
+
         self.initUI()
+        self.setup_progress_bar()
 
     def initUI(self):
-        # Настройка окна и иконочки)
         self.setFixedSize(800, 500)
         self.setWindowTitle('Практика')
         self.setWindowIcon(QIcon('icon.png'))
 
-        # делаем неизменяемыми все текстовые поля
         self.song_text.setReadOnly(True)
         self.battle_text.setReadOnly(True)
         self.accords_text.setReadOnly(True)
 
-        # функционал кнопок
-        self.show_battle_button.clicked.connect(self.show_battle)
-        self.show_accords_button.clicked.connect(self.show_accords)
-        self.hide_battle_button.clicked.connect(self.hide_battle)
-        self.hide_accords_button.clicked.connect(self.hide_accords)
-        self.back_button.clicked.connect(self.back_to_choice)
-        self.pause_button.clicked.connect(self.pause_play)
-        self.plus_button.clicked.connect(self.plus_time)
-        self.minus_button.clicked.connect(self.minus_time)
+        # Кнопки с анимацией
+        self.show_battle_button.clicked.connect(lambda: [self.animation_button(self.show_battle_button), self.show_battle()])
+        self.show_accords_button.clicked.connect(lambda: [self.animation_button(self.show_accords_button), self.show_accords()])
+        self.hide_battle_button.clicked.connect(lambda: [self.animation_button(self.hide_battle_button), self.hide_battle()])
+        self.hide_accords_button.clicked.connect(lambda: [self.animation_button(self.hide_accords_button), self.hide_accords()])
+        self.back_button.clicked.connect(lambda: [self.animation_button(self.back_button), self.back_to_choice()])
+        self.pause_button.clicked.connect(lambda: [self.animation_button(self.pause_button), self.pause_play()])
+        self.plus_button.clicked.connect(lambda: [self.animation_button(self.plus_button), self.plus_time()])
+        self.minus_button.clicked.connect(lambda: [self.animation_button(self.minus_button), self.minus_time()])
 
-        # функционал слайдеров
         self.sound_slider.valueChanged.connect(self.change_volume)
 
-        # покажем бой и аккорды изначально
         self.show_battle()
         self.show_accords()
 
-    # Показать бой
+    def setup_progress_bar(self):
+        self.progress_bar = QtWidgets.QProgressBar(self.centralwidget)
+        self.progress_bar.setGeometry(QtCore.QRect(10, 380, 780, 20))
+        self.progress_bar.setRange(0, int(self.song_length * 1000))
+        self.progress_bar.setValue(0)
+
+        self.time_label = QtWidgets.QLabel(self.centralwidget)
+        self.time_label.setGeometry(QtCore.QRect(10, 405, 100, 20))
+        self.time_label.setText("0:00")
+
+
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_progress)
+        self.timer.start(100)
+
+    def update_progress(self):
+        if not self.audio_loaded:
+            return
+        pos = pg.mixer.music.get_pos()
+        if pos == -1:
+            pos = 0
+        total_pos = self.start_pos * 1000 + pos
+        self.progress_bar.setValue(int(total_pos))
+        current_seconds = int(total_pos // 1000)
+        minutes = current_seconds // 60
+        seconds = current_seconds % 60
+        self.time_label.setText(f"{minutes}:{seconds:02d}")
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        if key == QtCore.Qt.Key.Key_Space:
+            self.pause_play()
+        elif key == QtCore.Qt.Key.Key_Left:
+            self.minus_time()
+        elif key == QtCore.Qt.Key.Key_Right:
+            self.plus_time()
+        else:
+            super().keyPressEvent(event)
+
     def show_battle(self):
         self.battle_text.setPlainText(self.battle)
 
-    # скрыть бой
     def hide_battle(self):
         self.battle_text.setPlainText('')
 
-    # Показать аккорды
     def show_accords(self):
         self.accords_text.setPlainText('\n'.join(self.accords))
 
-    # скрыть аккорды
     def hide_accords(self):
         self.accords_text.setPlainText('')
 
-    # вернуться к выбору трека
     def back_to_choice(self):
-        pg.mixer.music.stop()
+        if hasattr(self, 'timer'):
+            self.timer.stop()
+        if self.audio_loaded:
+            pg.mixer.music.stop()
         self.close()
 
     def change_volume(self):
+        if not self.audio_loaded:
+            return
         pg.mixer.music.set_volume(self.sound_slider.value() / 100)
-        # print(pg.mixer.music.get_volume())
 
     def pause_play(self):
+        if not self.audio_loaded:
+            return
         self.play = not self.play
         if self.play:
             self.pause_button.setText('⏸')
@@ -308,39 +397,34 @@ class practice_screen(QMainWindow, PracticeWindow):
             self.pause_button.setText('▶')
             pg.mixer.music.pause()
 
-    # перемотка вперед
     def plus_time(self):
-        # текущее место в треке в секундах
-        cur_pos = pg.mixer.music.get_pos() / 1000
+        if (not self.audio_loaded): return
 
-        # от момента начала + сколько прошло + 5 сек
-        self.start_pos += cur_pos + 5
+        cur_rel_pos = pg.mixer.music.get_pos() / 1000.0
+        new_abs_pos = self.start_pos + cur_rel_pos + 5
 
-        # если больше длины самого трека, то он начинается с начала
-        if self.start_pos > self.song_lenth:
-            self.start_pos = 0
-        pg.mixer.music.play(0, self.start_pos, 0)
+        if (new_abs_pos > self.song_length): new_abs_pos = self.song_length
 
-        # если на паузе, то не играем
-        if not self.play:
-            pg.mixer.music.pause()
+        self.start_pos = new_abs_pos
+        pg.mixer.music.play(0, self.start_pos)
 
-    # перемотку назад
+        if (not self.play): pg.mixer.music.pause()
+        self.statusBar().showMessage("⏩ +5 секунд", 1000)
+
+
     def minus_time(self):
-        # текущее место в треке в секундах
-        cur_pos = pg.mixer.music.get_pos() / 1000
+        if (not self.audio_loaded): return
 
-        # от момента начала + сколько прошло - 5 сек
-        self.start_pos += cur_pos - 5
+        cur_rel_pos = pg.mixer.music.get_pos() / 1000.0
+        new_abs_pos = self.start_pos + cur_rel_pos - 5
 
-        # если результат меньше нуля (трек начинается с отрицательной секунды), то начинать трек с 0
-        if self.start_pos < 0:
-            self.start_pos = 0
-        pg.mixer.music.play(0, self.start_pos, 0)
+        if (new_abs_pos < 0): new_abs_pos = 0
 
-        # если на паузе, то не играем
-        if not self.play:
-            pg.mixer.music.pause()
+        self.start_pos = new_abs_pos
+        pg.mixer.music.play(0, self.start_pos)
+
+        if (not self.play): pg.mixer.music.pause()
+        self.statusBar().showMessage("⏪ -5 секунд", 1000)
 
 
 if __name__ == '__main__':

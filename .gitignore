@@ -1,0 +1,14 @@
+# Директироии виртуальных окружений
+venv/
+env/
+ENV/
+.venv/
+
+# Кэш 
+__pycache__/
+
+# Файлы build & VSC
+.vscode/
+.idea/
+build/
+dist/
