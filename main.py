@@ -231,6 +231,11 @@ class practice_screen(QMainWindow, PracticeWindow):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, lambda: button.setStyleSheet(original_style))
 
+    def closeEvent(self, event):
+        if hasattr(self, 'timer'): self.timer.stop()
+        if self.audio_loaded: pg.mixer.music.stop()
+        event.accept()  
+
     def __init__(self, song_id):
         super(practice_screen, self).__init__()
         self.setupUi(self)
