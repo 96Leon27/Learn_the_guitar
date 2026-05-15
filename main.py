@@ -1,6 +1,6 @@
 import sys
 import sqlite3
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QApplication, QMainWindow, QInputDialog, QTableWidgetItem, QHeaderView
 from PyQt6.QtGui import QPainter, QColor, QIcon
 from PyQt6.QtCore import QPointF, Qt, pyqtSignal
@@ -214,20 +214,69 @@ class choose_screen(QMainWindow, ChooseWindow):
 class ClickableProgressBar(QtWidgets.QProgressBar):
     clicked = pyqtSignal(int)
 
-    def __init__(self, parent = None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimum(0)
+        self.setMaximum(100) 
+        self.setValue(0)
+        self.dragging = False
+        self.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #888;
+                border-radius: 4px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #1E90FF;
+                border-radius: 5px;
+            }
+        """)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.maximum() == 0:
+            return
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        ratio = self.value() / self.maximum()
+        x = int(ratio * self.width())
+        y = self.height() // 2
+        radius = 8
+        color = QtGui.QColor(30, 144, 255) if not self.dragging else QtGui.QColor(0, 100, 200)
+        painter.setBrush(color)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.drawEllipse(QtCore.QPoint(x, y), radius, radius)
+        painter.setPen(QtGui.QPen(QtCore.Qt.GlobalColor.white, 2))
+        painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(QtCore.QPoint(x, y), radius, radius)
+        painter.end()
 
     def mousePressEvent(self, event):
-        width = self.width()
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.dragging = True
+            self.update()
+            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x())
 
-        if (width > 0):
-            x = event.position().x() if hasattr(event, 'position') else event.x()
-            ratio = x / width
-            value = int(ratio * self.maximum())
-            self.setValue(value)
-            self.clicked.emit(value)
-        super().mousePressEvent(event)
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x())
+
+    def mouseReleaseEvent(self, event):
+        if self.dragging and event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.dragging = False
+            self.update()
+            self.clicked.emit(self.value())
+
+    def _set_value_from_pos(self, x):
+        width = self.width()
+        if width > 0:
+            ratio = max(0.0, min(1.0, x / width))
+            new_val = int(ratio * self.maximum())
+            if new_val != self.value():
+                self.setValue(new_val)
+                self.clicked.emit(new_val)
+        
 
 class practice_screen(QMainWindow, PracticeWindow):
     def animation_button(self, button):
@@ -324,6 +373,13 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.setWindowTitle('Практика')
         self.setWindowIcon(QIcon('icon.png'))
 
+        self.pause_button.move(380, 410)      
+        self.plus_button.move(440, 420)      
+        self.minus_button.move(340, 420)     
+        self.back_button.move(50, 420)
+        self.label_2.move(580, 420)     
+        self.sound_slider.move(620, 430) 
+
         self.song_text.setReadOnly(True)
         self.battle_text.setReadOnly(True)
         self.accords_text.setReadOnly(True)
@@ -362,7 +418,7 @@ class practice_screen(QMainWindow, PracticeWindow):
 
     def setup_progress_bar(self):
         self.progress_bar = ClickableProgressBar(self.centralwidget)
-        self.progress_bar.setGeometry(QtCore.QRect(10, 380, 780, 20))
+        self.progress_bar.setGeometry(QtCore.QRect(10, 380, 780, 16))
         self.progress_bar.setRange(0, int(self.song_length * 1000))
         self.progress_bar.setValue(0)
         self.progress_bar.clicked.connect(self.seek_to_position) 
