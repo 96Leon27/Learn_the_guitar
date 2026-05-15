@@ -100,7 +100,7 @@ class Learn_The_Guitar(QMainWindow, MainWindow):
     def run(self):
         self.ex = choose_screen()
         self.ex.show()
-
+        self.close()  
 
 class choose_screen(QMainWindow, ChooseWindow):
     def __init__(self):
@@ -199,8 +199,13 @@ class choose_screen(QMainWindow, ChooseWindow):
 
             if (1 <= song_id <= len(result)):
                 self.statusBar().showMessage("Запуск трека")
+
                 self.ex = practice_screen(str(song_id))
+                self.ex.choose_window = self
+
                 self.ex.show()
+
+                self.close()
             else:
                 self.statusBar().showMessage("Трека с таким ID нет в базе данных", 3000)
         except sqlite3.Error as e:
@@ -234,6 +239,7 @@ class practice_screen(QMainWindow, PracticeWindow):
     def closeEvent(self, event):
         if hasattr(self, 'timer'): self.timer.stop()
         if self.audio_loaded: pg.mixer.music.stop()
+        if (self.choose_window is not None): self.choose_window.show()
         event.accept()  
 
     def __init__(self, song_id):
@@ -243,6 +249,7 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.play = False
         self.start_pos = 0
         self.song_id = song_id
+        self.choose_window = None
 
         # Текст
         try:
@@ -405,10 +412,12 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.accords_text.setPlainText('')
 
     def back_to_choice(self):
-        if hasattr(self, 'timer'):
+        if (hasattr(self, 'timer')):
             self.timer.stop()
-        if self.audio_loaded:
+        if (self.audio_loaded):
             pg.mixer.music.stop()
+        if (self.choose_window is not None):
+            self.choose_window.show()
         self.close()
 
     def change_volume(self):
