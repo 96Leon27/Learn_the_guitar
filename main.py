@@ -218,31 +218,31 @@ class ClickableProgressBar(QtWidgets.QProgressBar):
         super().__init__(parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimum(0)
-        self.setMaximum(100) 
+        self.setMaximum(100)
         self.setValue(0)
         self.dragging = False
         self.setStyleSheet("""
             QProgressBar {
                 border: 1px solid #888;
-                border-radius: 4px;
+                border-radius: 3px;
                 text-align: center;
             }
             QProgressBar::chunk {
                 background-color: #1E90FF;
-                border-radius: 5px;
+                border-radius: 3px;
             }
         """)
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if self.maximum() == 0:
-            return
+        if (self.maximum() == 0): return
+
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         ratio = self.value() / self.maximum()
         x = int(ratio * self.width())
         y = self.height() // 2
-        radius = 8
+        radius = 5
         color = QtGui.QColor(30, 144, 255) if not self.dragging else QtGui.QColor(0, 100, 200)
         painter.setBrush(color)
         painter.setPen(QtCore.Qt.PenStyle.NoPen)
@@ -253,29 +253,33 @@ class ClickableProgressBar(QtWidgets.QProgressBar):
         painter.end()
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+        if (event.button() == QtCore.Qt.MouseButton.LeftButton):
             self.dragging = True
             self.update()
-            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x())
+            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x(), emit_click=True)
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self.dragging:
-            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x())
+        if (self.dragging):
+            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x(), emit_click=False)
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self.dragging and event.button() == QtCore.Qt.MouseButton.LeftButton:
+        if (self.dragging and event.button() == QtCore.Qt.MouseButton.LeftButton):
             self.dragging = False
             self.update()
             self.clicked.emit(self.value())
+        super().mouseReleaseEvent(event)
 
-    def _set_value_from_pos(self, x):
+    def _set_value_from_pos(self, x, emit_click=True):
         width = self.width()
-        if width > 0:
+        if (width > 0):
             ratio = max(0.0, min(1.0, x / width))
             new_val = int(ratio * self.maximum())
-            if new_val != self.value():
+            if (new_val != self.value()):
                 self.setValue(new_val)
-                self.clicked.emit(new_val)
+                if (emit_click):
+                    self.clicked.emit(new_val)
         
 
 class practice_screen(QMainWindow, PracticeWindow):
@@ -418,10 +422,12 @@ class practice_screen(QMainWindow, PracticeWindow):
 
     def setup_progress_bar(self):
         self.progress_bar = ClickableProgressBar(self.centralwidget)
-        self.progress_bar.setGeometry(QtCore.QRect(10, 380, 780, 16))
+        self.progress_bar.setGeometry(QtCore.QRect(10, 390, 780, 12))
         self.progress_bar.setRange(0, int(self.song_length * 1000))
         self.progress_bar.setValue(0)
-        self.progress_bar.clicked.connect(self.seek_to_position) 
+
+        self.progress_bar.clicked.connect(self.seek_to_position)   
+        self.progress_bar.valueChanged.connect(self.update_time_label)
 
         self.time_label = QtWidgets.QLabel(self.centralwidget)
         self.time_label.setGeometry(QtCore.QRect(10, 405, 100, 20))
@@ -431,18 +437,19 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.timer.timeout.connect(self.update_progress)
         self.timer.start(100)
 
+    def update_time_label(self, value_msec):
+        seconds = value_msec // 1000
+        minutes = seconds // 60
+        seconds = seconds % 60
+        self.time_label.setText(f"{minutes}:{seconds:02d}")
+
     def update_progress(self):
-        if not self.audio_loaded:
-            return
+        if (not self.audio_loaded): return
+        if (hasattr(self, 'progress_bar') and self.progress_bar.dragging): return
         pos = pg.mixer.music.get_pos()
-        if pos == -1:
-            pos = 0
+        if (pos == -1): pos = 0
         total_pos = self.start_pos * 1000 + pos
         self.progress_bar.setValue(int(total_pos))
-        current_seconds = int(total_pos // 1000)
-        minutes = current_seconds // 60
-        seconds = current_seconds % 60
-        self.time_label.setText(f"{minutes}:{seconds:02d}")
 
     def keyPressEvent(self, event):
         key = event.key()
