@@ -73,7 +73,7 @@ Learn_the_guitar/
 ├── main.py           # основной код приложения
 ├── tracks.sqlite     # база данных треков
 ├── requirements.txt  # зависимости
-└── README.md
+└── README.md         # документация
 ```
 
 ## Технологии 

@@ -1,9 +1,9 @@
 import sys
 import sqlite3
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QApplication, QMainWindow, QInputDialog, QTableWidgetItem, QHeaderView
 from PyQt6.QtGui import QPainter, QColor, QIcon
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt, pyqtSignal
 import pygame as pg
 import math as m
 
@@ -100,7 +100,7 @@ class Learn_The_Guitar(QMainWindow, MainWindow):
     def run(self):
         self.ex = choose_screen()
         self.ex.show()
-
+        self.close()  
 
 class choose_screen(QMainWindow, ChooseWindow):
     def __init__(self):
@@ -186,16 +186,6 @@ class choose_screen(QMainWindow, ChooseWindow):
         except sqlite3.Error as e:            
             self.statusBar().showMessage(F"Ошибка: {e}")
 
-    # def run(self):
-    #     cur = self.con.cursor()
-    #     result = cur.execute(f"""SELECT * FROM Tracks""").fetchall()
-    #     if 1 <= int(self.song_id.text()) <= len(result):
-    #         self.statusBar().showMessage(f"Запуск трека")
-    #         self.ex = practice_screen(self.song_id.text())
-    #         self.ex.show()
-    #     else:
-    #         self.statusBar().showMessage(f"Трека с таким id нет в базе данных")
-
     def run(self):
         try:
             song_id = int(self.song_id.text())
@@ -209,12 +199,88 @@ class choose_screen(QMainWindow, ChooseWindow):
 
             if (1 <= song_id <= len(result)):
                 self.statusBar().showMessage("Запуск трека")
+
                 self.ex = practice_screen(str(song_id))
+                self.ex.choose_window = self
+
                 self.ex.show()
+
+                self.close()
             else:
                 self.statusBar().showMessage("Трека с таким ID нет в базе данных", 3000)
         except sqlite3.Error as e:
             self.statusBar().showMessage(f"Ошибка БД: {e}", 3000)
+
+class ClickableProgressBar(QtWidgets.QProgressBar):
+    clicked = pyqtSignal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setMinimum(0)
+        self.setMaximum(100)
+        self.setValue(0)
+        self.dragging = False
+        self.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #888;
+                border-radius: 3px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #1E90FF;
+                border-radius: 3px;
+            }
+        """)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if (self.maximum() == 0): return
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        ratio = self.value() / self.maximum()
+        x = int(ratio * self.width())
+        y = self.height() // 2
+        radius = 5
+        color = QtGui.QColor(30, 144, 255) if not self.dragging else QtGui.QColor(0, 100, 200)
+        painter.setBrush(color)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.drawEllipse(QtCore.QPoint(x, y), radius, radius)
+        painter.setPen(QtGui.QPen(QtCore.Qt.GlobalColor.white, 2))
+        painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(QtCore.QPoint(x, y), radius, radius)
+        painter.end()
+
+    def mousePressEvent(self, event):
+        if (event.button() == QtCore.Qt.MouseButton.LeftButton):
+            self.dragging = True
+            self.update()
+            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x(), emit_click=True)
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (self.dragging):
+            self._set_value_from_pos(event.position().x() if hasattr(event, 'position') else event.x(), emit_click=False)
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if (self.dragging and event.button() == QtCore.Qt.MouseButton.LeftButton):
+            self.dragging = False
+            self.update()
+            self.clicked.emit(self.value())
+        super().mouseReleaseEvent(event)
+
+    def _set_value_from_pos(self, x, emit_click=True):
+        width = self.width()
+        if (width > 0):
+            ratio = max(0.0, min(1.0, x / width))
+            new_val = int(ratio * self.maximum())
+            if (new_val != self.value()):
+                self.setValue(new_val)
+                if (emit_click):
+                    self.clicked.emit(new_val)
+        
 
 class practice_screen(QMainWindow, PracticeWindow):
     def animation_button(self, button):
@@ -223,6 +289,12 @@ class practice_screen(QMainWindow, PracticeWindow):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, lambda: button.setStyleSheet(original_style))
 
+    def closeEvent(self, event):
+        if hasattr(self, 'timer'): self.timer.stop()
+        if self.audio_loaded: pg.mixer.music.stop()
+        if (self.choose_window is not None): self.choose_window.show()
+        event.accept()  
+
     def __init__(self, song_id):
         super(practice_screen, self).__init__()
         self.setupUi(self)
@@ -230,6 +302,7 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.play = False
         self.start_pos = 0
         self.song_id = song_id
+        self.choose_window = None
 
         # Текст
         try:
@@ -304,6 +377,13 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.setWindowTitle('Практика')
         self.setWindowIcon(QIcon('icon.png'))
 
+        self.pause_button.move(380, 410)      
+        self.plus_button.move(440, 420)      
+        self.minus_button.move(340, 420)     
+        self.back_button.move(50, 420)
+        self.label_2.move(580, 420)     
+        self.sound_slider.move(620, 430) 
+
         self.song_text.setReadOnly(True)
         self.battle_text.setReadOnly(True)
         self.accords_text.setReadOnly(True)
@@ -323,33 +403,53 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.show_battle()
         self.show_accords()
 
+    def seek_to_position(self, value_msec):
+        if (not self.audio_loaded): return
+
+        new_pos_sec = value_msec / 1000.0
+
+        if (new_pos_sec < 0): new_pos_sec = 0
+        if (new_pos_sec > self.song_length): new_pos_sec = self.song_length
+
+        self.start_pos = new_pos_sec
+        pg.mixer.music.play(0, self.start_pos)
+
+        if (not self.play): pg.mixer.music.pause()
+
+        minutes = int(new_pos_sec // 60)
+        seconds = int(new_pos_sec % 60)
+        self.statusBar().showMessage(f"Перемотка на {minutes}:{seconds:02d}", 1000)
+
     def setup_progress_bar(self):
-        self.progress_bar = QtWidgets.QProgressBar(self.centralwidget)
-        self.progress_bar.setGeometry(QtCore.QRect(10, 380, 780, 20))
+        self.progress_bar = ClickableProgressBar(self.centralwidget)
+        self.progress_bar.setGeometry(QtCore.QRect(10, 390, 780, 12))
         self.progress_bar.setRange(0, int(self.song_length * 1000))
         self.progress_bar.setValue(0)
+
+        self.progress_bar.clicked.connect(self.seek_to_position)   
+        self.progress_bar.valueChanged.connect(self.update_time_label)
 
         self.time_label = QtWidgets.QLabel(self.centralwidget)
         self.time_label.setGeometry(QtCore.QRect(10, 405, 100, 20))
         self.time_label.setText("0:00")
 
-
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_progress)
         self.timer.start(100)
 
+    def update_time_label(self, value_msec):
+        seconds = value_msec // 1000
+        minutes = seconds // 60
+        seconds = seconds % 60
+        self.time_label.setText(f"{minutes}:{seconds:02d}")
+
     def update_progress(self):
-        if not self.audio_loaded:
-            return
+        if (not self.audio_loaded): return
+        if (hasattr(self, 'progress_bar') and self.progress_bar.dragging): return
         pos = pg.mixer.music.get_pos()
-        if pos == -1:
-            pos = 0
+        if (pos == -1): pos = 0
         total_pos = self.start_pos * 1000 + pos
         self.progress_bar.setValue(int(total_pos))
-        current_seconds = int(total_pos // 1000)
-        minutes = current_seconds // 60
-        seconds = current_seconds % 60
-        self.time_label.setText(f"{minutes}:{seconds:02d}")
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -375,10 +475,12 @@ class practice_screen(QMainWindow, PracticeWindow):
         self.accords_text.setPlainText('')
 
     def back_to_choice(self):
-        if hasattr(self, 'timer'):
+        if (hasattr(self, 'timer')):
             self.timer.stop()
-        if self.audio_loaded:
+        if (self.audio_loaded):
             pg.mixer.music.stop()
+        if (self.choose_window is not None):
+            self.choose_window.show()
         self.close()
 
     def change_volume(self):
