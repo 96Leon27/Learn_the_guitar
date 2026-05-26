@@ -1,6 +1,6 @@
 import sys
 import sqlite3
-from PyQt6.QtWidgets import QApplication, QMainWindow, QInputDialog, QTableWidgetItem, QHeaderView
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QTableWidgetItem, QHeaderView
 from PyQt6.QtGui import QIcon, QPixmap
 import pygame as pg
 
@@ -66,12 +66,14 @@ class Learn_The_Guitar(QMainWindow, MainWindow):
 
     # функция закрытия приложение через приложение
     def close_app(self):
-        # не разобрался с Dialog.CloseEvent =(
-        res, ok_pressed = QInputDialog.getItem(
-            self, "Закрыть приложение", "Вы действительно хотите уйти?",
-            ("Да", "Нет"), 0, False)
-
-        if ok_pressed and res == 'Да':
+        reply = QMessageBox.question(
+            self,
+            "Закрыть приложение",
+            "Вы действительно хотите уйти?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
             app.quit()
 
     # основная функция приложения

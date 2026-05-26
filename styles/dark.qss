@@ -1,31 +1,159 @@
+/* Основное окно */
 QWidget {
     background-color: #1e1e1e;
     color: #d4d4d4;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
 }
+
+/* Кнопки: градиент, тень, анимация при наведении и нажатии */
 QPushButton {
-    background-color: #3c3c3c;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #3c3c3c, stop:1 #2c2c2c);
     border: 1px solid #555555;
-    border-radius: 4px;
+    border-radius: 6px;
+    padding: 6px 12px;
     color: #d4d4d4;
+    font-weight: bold;
 }
 QPushButton:hover {
-    background-color: #4c4c4c;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4c4c4c, stop:1 #3c3c3c);
+    border-color: #777777;
 }
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #2c2c2c, stop:1 #1c1c1c);
+    padding-top: 7px;
+    padding-bottom: 5px;
+}
+QPushButton:focus {
+    outline: none;
+    border-color: #8a8a8a;
+}
+
+/* Поля ввода и текстовые поля */
 QLineEdit, QTextEdit {
     background-color: #2d2d2d;
     border: 1px solid #555555;
-    border-radius: 4px;
+    border-radius: 6px;
+    padding: 4px 8px;
     color: #d4d4d4;
+    selection-background-color: #3c6e8f;
 }
+QLineEdit:focus, QTextEdit:focus {
+    border-color: #6a9fb5;
+    background-color: #353535;
+}
+QLineEdit:hover, QTextEdit:hover {
+    border-color: #777777;
+}
+
+/* Таблица */
 QTableWidget {
     background-color: #252526;
     alternate-background-color: #2d2d2d;
     border: 1px solid #555555;
-    color: #d4d4d4;
+    border-radius: 6px;
+    gridline-color: #3c3c3c;
+}
+QTableWidget::item:selected {
+    background-color: #3c6e8f;
 }
 QHeaderView::section {
-    background-color: #3c3c3c;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #3c3c3c, stop:1 #2c2c2c);
     font-weight: bold;
     color: #d4d4d4;
     border: 1px solid #555555;
+    padding: 4px;
+}
+QTableCornerButton::section {
+    background-color: #3c3c3c;
+}
+
+/* Полоса прокрутки (для QTextEdit, QTableWidget и др.) */
+QScrollBar:vertical {
+    background: #2d2d2d;
+    width: 12px;
+    border-radius: 6px;
+}
+QScrollBar::handle:vertical {
+    background: #5a5a5a;
+    border-radius: 6px;
+    min-height: 20px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #7a7a7a;
+}
+QScrollBar::handle:vertical:pressed {
+    background: #3a3a3a;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}
+QScrollBar:horizontal {
+    background: #2d2d2d;
+    height: 12px;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background: #5a5a5a;
+    border-radius: 6px;
+    min-width: 20px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #7a7a7a;
+}
+QScrollBar::handle:horizontal:pressed {
+    background: #3a3a3a;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0;
+}
+
+/* Слайдер громкости */
+QSlider::groove:horizontal {
+    border: 1px solid #555555;
+    height: 6px;
+    background: #3c3c3c;
+    border-radius: 3px;
+}
+QSlider::handle:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #8a8a8a, stop:1 #aaa);
+    border: 1px solid #777;
+    width: 14px;
+    margin: -4px 0;
+    border-radius: 7px;
+}
+QSlider::handle:horizontal:hover {
+    background: #c0c0c0;
+    width: 16px;
+    margin: -5px 0;
+}
+QSlider::handle:horizontal:pressed {
+    background: #6a6a6a;
+}
+QSlider::sub-page:horizontal {
+    background: #6a9fb5;
+    border-radius: 3px;
+}
+
+/* Строка состояния */
+QStatusBar {
+    background-color: #252526;
+    border-top: 1px solid #3c3c3c;
+    color: #b0b0b0;
+}
+QStatusBar::item {
+    border: none;
+}
+
+/* Всплывающие подсказки */
+QToolTip {
+    background-color: #3c3c3c;
+    color: #f0f0f0;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 2px 4px;
 }
