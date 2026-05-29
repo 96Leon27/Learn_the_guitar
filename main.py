@@ -371,10 +371,10 @@ class MenuBackgroundMusic(QtCore.QObject):
         self.sound: Optional[pg.mixer.Sound] = None
         self.channel: Optional[pg.mixer.Channel] = None
         self.enabled = True
-        self.scan_tracks()
+        self.scantracks()
         self.play_first_available()
 
-    def scan_tracks(self):
+    def scantracks(self):
         self.tracks = []
         try:
             files = sorted(
@@ -451,7 +451,7 @@ class MenuBackgroundMusic(QtCore.QObject):
 
     def resume_if_possible(self):
         if not self.tracks:
-            self.scan_tracks()
+            self.scantracks()
         if self.channel is not None and self.sound is not None:
             try:
                 self.channel.unpause()
@@ -586,7 +586,7 @@ class BackgroundMusicPopup(QFrame):
         title.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
         layout.addWidget(title)
 
-        self.manager.scan_tracks()
+        self.manager.scantracks()
         if not self.manager.tracks:
             empty = QLabel("Файлы не найдены. Добавь треки в папку\nmenu_background_music")
             empty.setWordWrap(True)
@@ -650,7 +650,7 @@ class BackgroundMusicPopup(QFrame):
 class BackgroundMusicChip(GlassCard):
     """Плашка фонового трека в правом верхнем углу главного меню."""
 
-    def __init__(self, manager: MenuBackgroundMusic, parent=None):
+    def __init__(self, manager, parent=None):
         super().__init__(parent)
         self.manager = manager
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -692,7 +692,7 @@ class BackgroundMusicChip(GlassCard):
         self.manager.volumeChanged.connect(lambda value: self.refresh())
         self.refresh()
 
-    def refresh(self) -> None:
+    def refresh(self):
         track = self.manager.current_track()
         if track is None:
             self.title.setText("Нет фонового трека")
@@ -713,7 +713,6 @@ class BackgroundMusicChip(GlassCard):
 
 
 class ExitConfirmOverlay(QWidget):
-    """Внутреннее подтверждение выхода без системного QMessageBox."""
 
     confirmed = QtCore.pyqtSignal()
     cancelled = QtCore.pyqtSignal()
@@ -801,9 +800,6 @@ class ExitConfirmOverlay(QWidget):
         # пропускать клики к кнопкам главного меню под ним.
         event.accept()
 
-
-# ---------- Главное окно ----------
-
 class LearnTheGuitar(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -828,10 +824,10 @@ class LearnTheGuitar(QMainWindow):
         self.stack.addWidget(self.menu_page)
         self.stack.addWidget(self.help_page)
 
-        self._build_menu_page()
-        self._build_help_page()
+        self.build_menu_page()
+        self.build_help_page()
 
-    def _build_menu_page(self):
+    def build_menu_page(self):
         page = self.menu_page
 
         # Плашка фоновой музыки теперь лежит поверх контента в правом верхнем
@@ -856,8 +852,8 @@ class LearnTheGuitar(QMainWindow):
         self.exit_confirm_overlay = ExitConfirmOverlay(page)
         self.exit_confirm_overlay.hide()
         overlay.addWidget(self.exit_confirm_overlay, 0, 0)
-        self.exit_confirm_overlay.cancelled.connect(self._hide_exit_confirmation)
-        self.exit_confirm_overlay.confirmed.connect(self._confirm_exit)
+        self.exit_confirm_overlay.cancelled.connect(self.hide_exit_confirmation)
+        self.exit_confirm_overlay.confirmed.connect(self.confirm_exit)
 
         main = QVBoxLayout(content)
         main.setContentsMargins(0, 8, 0, 0)
@@ -911,7 +907,7 @@ class LearnTheGuitar(QMainWindow):
         self.help_button.clicked.connect(lambda: self.stack.setCurrentWidget(self.help_page))
         self.exit_button.clicked.connect(self.close_app)
 
-    def _build_help_page(self):
+    def build_help_page(self):
         page = self.help_page
         layout = QVBoxLayout(page)
         layout.setContentsMargins(210, 90, 210, 90)
@@ -952,22 +948,22 @@ class LearnTheGuitar(QMainWindow):
         self.close()
 
     def close_app(self):
-        self._show_exit_confirmation()
+        self.show_exit_confirmation()
 
-    def _show_exit_confirmation(self):
+    def show_exit_confirmation(self):
         self.exit_confirm_overlay.show()
         self.exit_confirm_overlay.raise_()
         self.exit_confirm_overlay.setFocus(Qt.FocusReason.PopupFocusReason)
 
-    def _hide_exit_confirmation(self):
+    def hide_exit_confirmation(self):
         self.exit_confirm_overlay.hide()
 
-    def _confirm_exit(self):
+    def confirm_exit(self):
         self.background_music.stop()
         QApplication.quit()
 
     @staticmethod
-    def _text_edit_style() -> str:
+    def _text_edit_style():
         return f"""
             QPlainTextEdit {{
                 color: {TEXT};
@@ -979,9 +975,6 @@ class LearnTheGuitar(QMainWindow):
                 font-family: 'Segoe UI';
             }}
         """
-
-
-# ---------- Окно выбора трека ----------
 
 # Логический порядок сложности нужен, чтобы значения вроде
 # «Легко / Средне / Сложно» не сортировались как обычный текст.
@@ -1001,16 +994,14 @@ COMPLEXITY_WORD_ORDER = {
 }
 
 
-def normalize_complexity(value: object):
-    """Возвращает число для цифровой сложности и строку для словесной."""
+def normalize_complexity(value):
     try:
         return int(value)
     except (TypeError, ValueError):
         return str(value).strip()
 
 
-def complexity_rank(value: object) -> int:
-    """Ключ сортировки сложности: числа сортируются как числа, слова — логически."""
+def complexity_rank(value):
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -1020,7 +1011,6 @@ def complexity_rank(value: object) -> int:
 
 @dataclass(frozen=True)
 class Track:
-    """Одна строка из базы Tracks в нормальном Python-виде."""
 
     id: int
     singer: str
@@ -1029,7 +1019,7 @@ class Track:
     complexity: int
 
     @classmethod
-    def from_row(cls, row: Sequence[object]) -> "Track":
+    def from_row(cls, row):
         return cls(
             id=int(row[0]),
             singer=str(row[1]).capitalize(),
@@ -1040,19 +1030,18 @@ class Track:
 
 
 class TrackRepository:
-    """Изолирует работу с SQLite, чтобы окно не смешивало GUI и SQL."""
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path):
         self.db_path = db_path
         self.connection: Optional[sqlite3.Connection] = None
 
-    def connect(self) -> bool:
+    def connect(self):
         if not self.db_path.exists():
             return False
         self.connection = sqlite3.connect(str(self.db_path))
         return True
 
-    def all_tracks(self) -> list[Track]:
+    def alltracks(self):
         if self.connection is None:
             return []
         rows = self.connection.execute(
@@ -1060,7 +1049,7 @@ class TrackRepository:
         ).fetchall()
         return [Track.from_row(row) for row in rows]
 
-    def get_track(self, track_id: int) -> Optional[Track]:
+    def get_track(self, track_id):
         if self.connection is None:
             return None
         row = self.connection.execute(
@@ -1069,14 +1058,13 @@ class TrackRepository:
         ).fetchone()
         return Track.from_row(row) if row else None
 
-    def close(self) -> None:
+    def close(self):
         if self.connection is not None:
             self.connection.close()
             self.connection = None
 
 
 class SearchPanel(GlassCard):
-    """Поиск с задержкой, чтобы таблица не перерисовывалась на каждую букву мгновенно."""
 
     searchChanged = QtCore.pyqtSignal(str)
     filterClicked = QtCore.pyqtSignal()
@@ -1111,22 +1099,22 @@ class SearchPanel(GlassCard):
         layout.addWidget(self.clear_button)
         layout.addWidget(self.filter_button)
 
-        self._debounce = QTimer(self)
-        self._debounce.setSingleShot(True)
-        self._debounce.setInterval(250)
-        self._debounce.timeout.connect(lambda: self.searchChanged.emit(self.line.text().strip()))
+        self.debounce = QTimer(self)
+        self.debounce.setSingleShot(True)
+        self.debounce.setInterval(250)
+        self.debounce.timeout.connect(lambda: self.searchChanged.emit(self.line.text().strip()))
 
-        self.line.textChanged.connect(lambda: self._debounce.start())
+        self.line.textChanged.connect(lambda: self.debounce.start())
         self.line.returnPressed.connect(lambda: self.searchChanged.emit(self.line.text().strip()))
-        self.clear_button.clicked.connect(self._clear)
+        self.clear_button.clicked.connect(self.clear)
         self.filter_button.clicked.connect(self.filterClicked.emit)
 
-    def _clear(self):
+    def clear(self):
         self.line.clear()
         self.searchChanged.emit("")
 
     @staticmethod
-    def _line_edit_style() -> str:
+    def _line_edit_style():
         return f"""
             QLineEdit {{
                 color: {TEXT};
@@ -1141,11 +1129,7 @@ class SearchPanel(GlassCard):
 
 
 class FilterPanel(GlassCard):
-    """Компактная панель фильтрации по сложности.
-
-    Отдельный выпадающий список сортировки убран: порядок всегда
-    фиксированный — от простых треков к сложным.
-    """
+    """Компактная панель фильтрации по сложности."""
 
     filtersChanged = QtCore.pyqtSignal()
 
@@ -1178,12 +1162,12 @@ class FilterPanel(GlassCard):
         layout.addWidget(self.complexity_box)
         layout.addStretch(1)
 
-    def complexity_value(self) -> Optional[int]:
+    def complexity_value(self):
         index = self.complexity_box.currentIndex()
         return None if index == 0 else index
 
     @staticmethod
-    def _combo_style() -> str:
+    def _combo_style():
         return f"""
             QComboBox {{
                 color: {TEXT};
@@ -1216,11 +1200,11 @@ class TrackTable(QTableWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._selected_track_id: Optional[int] = None
-        self._tracks: list[Track] = []
-        self._setup()
+        self.selected_track_id = None
+        self.tracks = []
+        self.setup()
 
-    def _setup(self):
+    def setup(self):
         self.setColumnCount(5)
         self.setHorizontalHeaderLabels(self.HEADERS)
         self.setAlternatingRowColors(False)
@@ -1231,8 +1215,8 @@ class TrackTable(QTableWidget):
         self.setShowGrid(False)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setStyleSheet(self._table_style())
-        self.cellClicked.connect(self._emit_track)
-        self.cellDoubleClicked.connect(self._emit_activation)
+        self.cellClicked.connect(self.emit_track)
+        self.cellDoubleClicked.connect(self.emit_activation)
 
         header = self.horizontalHeader()
         header.setSectionsClickable(True)
@@ -1244,19 +1228,19 @@ class TrackTable(QTableWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
-    def populate(self, tracks: list[Track], selected_track_id: Optional[int] = None):
-        self._tracks = tracks
+    def populate(self, tracks, selected_track_id=None):
+        self.tracks = tracks
         if selected_track_id is not None:
-            self._selected_track_id = selected_track_id
+            self.selected_track_id = selected_track_id
 
         self.setRowCount(len(tracks))
         for row_index, track in enumerate(tracks):
-            is_selected = track.id == self._selected_track_id
-            self._set_item(row_index, 0, f"▮  {track.id}" if is_selected else str(track.id), track.id)
-            self._set_item(row_index, 1, track.title, track.id)
-            self._set_item(row_index, 2, track.singer, track.id)
-            self._set_item(row_index, 3, track.duration, track.id, center=True)
-            self._set_item(row_index, 4, self._complexity_text(track.complexity), track.id, stars=True)
+            is_selected = track.id == self.selected_track_id
+            self.set_item(row_index, 0, f"▮  {track.id}" if is_selected else str(track.id), track.id)
+            self.set_item(row_index, 1, track.title, track.id)
+            self.set_item(row_index, 2, track.singer, track.id)
+            self.set_item(row_index, 3, track.duration, track.id, center=True)
+            self.set_item(row_index, 4, self._complexity_text(track.complexity), track.id, stars=True)
             self.setRowHeight(row_index, 58)
 
         self.refresh_selection()
@@ -1267,7 +1251,7 @@ class TrackTable(QTableWidget):
             if not item:
                 continue
             track_id = item.data(Qt.ItemDataRole.UserRole)
-            is_selected = track_id == self._selected_track_id
+            is_selected = track_id == self.selected_track_id
             item.setText(f"▮  {track_id}" if is_selected else str(track_id))
             for col in range(self.columnCount()):
                 cell = self.item(row, col)
@@ -1284,27 +1268,27 @@ class TrackTable(QTableWidget):
             if is_selected:
                 self.selectRow(row)
 
-    def set_selected_track(self, track_id: int):
-        self._selected_track_id = track_id
+    def set_selected_track(self, track_id):
+        self.selected_track_id = track_id
         self.refresh_selection()
 
-    def _emit_track(self, row: int, column: int):
+    def emit_track(self, row):
         track_id = self.track_id_at(row)
         if track_id is not None:
-            self._selected_track_id = track_id
+            self.selected_track_id = track_id
             self.refresh_selection()
             self.trackPicked.emit(track_id)
 
-    def _emit_activation(self, row: int, column: int):
+    def emit_activation(self, row):
         track_id = self.track_id_at(row)
         if track_id is not None:
             self.trackActivated.emit(track_id)
 
-    def track_id_at(self, row: int) -> Optional[int]:
+    def track_id_at(self, row):
         item = self.item(row, 0)
         return item.data(Qt.ItemDataRole.UserRole) if item else None
 
-    def _set_item(self, row: int, column: int, text: str, track_id: int, center: bool = False, stars: bool = False):
+    def set_item(self, row, column, text, track_id, center=False, stars=False):
         item = QTableWidgetItem(text)
         item.setData(Qt.ItemDataRole.UserRole, track_id)
         item.setTextAlignment(
@@ -1316,7 +1300,7 @@ class TrackTable(QTableWidget):
             item.setFont(QFont("Segoe UI", 14))
         self.setItem(row, column, item)
 
-    def set_sort_indicator(self, column: Optional[int], ascending: bool) -> None:
+    def set_sort_indicator(self, column, ascending):
         labels = list(self.HEADERS)
         header = self.horizontalHeader()
         if column is None:
@@ -1330,19 +1314,19 @@ class TrackTable(QTableWidget):
         self.setHorizontalHeaderLabels(labels)
 
     @staticmethod
-    def _complexity_text(value: int):
+    def _complexity_text(value):
         try:
             return TrackTable._stars(int(value))
         except (TypeError, ValueError):
             return str(value).capitalize()
 
     @staticmethod
-    def _stars(value: int) -> str:
+    def _stars(value):
         value = max(1, min(5, int(value)))
         return "★ " * value + "☆ " * (5 - value)
 
     @staticmethod
-    def _table_style() -> str:
+    def _table_style():
         return f"""
             QTableWidget {{
                 color: {TEXT};
@@ -1391,7 +1375,7 @@ class MiniEqualizer(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
 
-    def set_animated(self, animated: bool) -> None:
+    def set_animated(self, animated):
         self._animated = animated
         if animated:
             if not self.timer.isActive():
@@ -1459,20 +1443,20 @@ class ChooseBottomBar(GlassCard):
         layout.addLayout(start_box)
 
         self.back_button.clicked.connect(self.backRequested.emit)
-        self.start_button.clicked.connect(self._emit_start)
-        self.song_id.lineEdit().returnPressed.connect(self._emit_start)
+        self.start_button.clicked.connect(self.emit_start)
+        self.song_id.lineEdit().returnPressed.connect(self.emit_start)
 
-    def set_track_id(self, track_id: int):
+    def set_track_id(self, track_id):
         self.song_id.setValue(track_id)
 
-    def track_id(self) -> int:
+    def track_id(self):
         return self.song_id.value()
 
-    def _emit_start(self):
+    def emit_start(self):
         self.startRequested.emit(self.song_id.value())
 
     @staticmethod
-    def _spin_style() -> str:
+    def _spin_style():
         return f"""
             QSpinBox {{
                 color: {TEXT};
@@ -1493,7 +1477,6 @@ class ChooseBottomBar(GlassCard):
 
 
 class ChooseScreen(QMainWindow):
-    """Вторая страница: выбор трека в стиле присланного референса."""
 
     def __init__(self):
         super().__init__()
@@ -1502,8 +1485,8 @@ class ChooseScreen(QMainWindow):
         set_app_icon(self)
 
         self.repository = TrackRepository(BASE_DIR / "tracks.sqlite")
-        self.all_tracks: list[Track] = []
-        self.visible_tracks: list[Track] = []
+        self.alltracks: list[Track] = []
+        self.visibletracks: list[Track] = []
         self.selected_track_id: Optional[int] = None
         self.current_search = ""
         self.sort_column: Optional[int] = None
@@ -1576,12 +1559,12 @@ class ChooseScreen(QMainWindow):
             if not self.repository.connect():
                 self.status_label.setText("Файл tracks.sqlite не найден. Проверь расположение базы данных.")
                 return
-            self.all_tracks = self.repository.all_tracks()
-            if self.all_tracks:
-                self.selected_track_id = self.all_tracks[0].id
+            self.alltracks = self.repository.alltracks()
+            if self.alltracks:
+                self.selected_track_id = self.alltracks[0].id
                 self.bottom_bar.set_track_id(self.selected_track_id)
             self.apply_filters()
-            self.status_label.setText(f"Загружено треков: {len(self.all_tracks)}")
+            self.status_label.setText(f"Загружено треков: {len(self.alltracks)}")
         except sqlite3.Error as error:
             self.status_label.setText(f"Ошибка базы данных: {error}")
 
@@ -1601,7 +1584,7 @@ class ChooseScreen(QMainWindow):
         self.apply_filters()
 
     def apply_filters(self):
-        tracks = list(self.all_tracks)
+        tracks = list(self.alltracks)
         if self.current_search:
             tracks = [
                 track for track in tracks
@@ -1614,18 +1597,18 @@ class ChooseScreen(QMainWindow):
 
         self._apply_sorting(tracks)
 
-        self.visible_tracks = tracks
-        self.tableWidget.populate(self.visible_tracks, self.selected_track_id)
+        self.visibletracks = tracks
+        self.tableWidget.populate(self.visibletracks, self.selected_track_id)
         self.tableWidget.set_sort_indicator(self.sort_column, self.sort_ascending)
         self._sync_selection_after_filter()
         self.status_label.setText(self._status_text())
 
     def _sync_selection_after_filter(self):
-        if not self.visible_tracks:
+        if not self.visibletracks:
             return
-        visible_ids = {track.id for track in self.visible_tracks}
+        visible_ids = {track.id for track in self.visibletracks}
         if self.selected_track_id not in visible_ids:
-            self.select_track(self.visible_tracks[0].id)
+            self.select_track(self.visibletracks[0].id)
         else:
             self.tableWidget.set_selected_track(int(self.selected_track_id))
 
@@ -1665,11 +1648,11 @@ class ChooseScreen(QMainWindow):
         super().closeEvent(event)
 
     def _status_text(self) -> str:
-        if not self.visible_tracks:
+        if not self.visibletracks:
             return "Ничего не найдено. Очисти поиск или измени фильтр."
         if self.current_search or self.filter_panel.complexity_value() is not None:
-            return f"Найдено треков: {len(self.visible_tracks)}"
-        return f"Доступно треков: {len(self.visible_tracks)}"
+            return f"Найдено треков: {len(self.visibletracks)}"
+        return f"Доступно треков: {len(self.visibletracks)}"
 
     def _apply_sorting(self, tracks: list[Track]) -> None:
         if self.sort_column is None:
@@ -2648,7 +2631,6 @@ class PlayerBar(GlassCard):
 
 
 class PracticeScreen(QMainWindow):
-    """Третья страница: практика песни в стиле отправленного референса."""
 
     def __init__(self, song_id: str, singer: str, song: str, duration: str = "0:00"):
         super().__init__()
