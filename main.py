@@ -5,7 +5,7 @@ import sqlite3
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt, QTimer, QEasingCurve, QPropertyAnimation
@@ -1485,11 +1485,11 @@ class ChooseScreen(QMainWindow):
         set_app_icon(self)
 
         self.repository = TrackRepository(BASE_DIR / "tracks.sqlite")
-        self.alltracks: list[Track] = []
-        self.visibletracks: list[Track] = []
-        self.selected_track_id: Optional[int] = None
+        self.alltracks = []
+        self.visibletracks = []
+        self.selected_track_id = None
         self.current_search = ""
-        self.sort_column: Optional[int] = None
+        self.sort_column = None
         self.sort_ascending = True
         self.background_music = get_menu_background_music()
         self.background_music.set_context("choose")
@@ -1497,7 +1497,7 @@ class ChooseScreen(QMainWindow):
         self.bg = AnimatedBackground(self)
         self.setCentralWidget(self.bg)
         self.build_ui()
-        self._connect_database()
+        self.connect_database()
 
     def build_ui(self):
         root = QVBoxLayout(self.bg)
@@ -1554,7 +1554,7 @@ class ChooseScreen(QMainWindow):
         self.bottom_bar.backRequested.connect(self.back_to_main)
         self.bottom_bar.startRequested.connect(self.run_practice)
 
-    def _connect_database(self):
+    def connect_database(self):
         try:
             if not self.repository.connect():
                 self.status_label.setText("Файл tracks.sqlite не найден. Проверь расположение базы данных.")
@@ -1568,14 +1568,14 @@ class ChooseScreen(QMainWindow):
         except sqlite3.Error as error:
             self.status_label.setText(f"Ошибка базы данных: {error}")
 
-    def on_search_changed(self, text: str):
+    def on_search_changed(self, text):
         self.current_search = text.strip().lower()
         self.apply_filters()
 
     def toggle_filters(self):
         self.filter_panel.setVisible(not self.filter_panel.isVisible())
 
-    def on_table_header_clicked(self, column: int):
+    def on_table_header_clicked(self, column):
         if self.sort_column == column:
             self.sort_ascending = not self.sort_ascending
         else:
@@ -1595,13 +1595,13 @@ class ChooseScreen(QMainWindow):
         if complexity is not None:
             tracks = [track for track in tracks if complexity_rank(track.complexity) == complexity]
 
-        self._apply_sorting(tracks)
+        self.apply_sorting(tracks)
 
         self.visibletracks = tracks
         self.tableWidget.populate(self.visibletracks, self.selected_track_id)
         self.tableWidget.set_sort_indicator(self.sort_column, self.sort_ascending)
         self._sync_selection_after_filter()
-        self.status_label.setText(self._status_text())
+        self.status_label.setText(self.status_text())
 
     def _sync_selection_after_filter(self):
         if not self.visibletracks:
@@ -1612,7 +1612,7 @@ class ChooseScreen(QMainWindow):
         else:
             self.tableWidget.set_selected_track(int(self.selected_track_id))
 
-    def select_track(self, track_id: int):
+    def select_track(self, track_id):
         self.selected_track_id = track_id
         self.bottom_bar.set_track_id(track_id)
         self.tableWidget.set_selected_track(track_id)
@@ -1620,7 +1620,7 @@ class ChooseScreen(QMainWindow):
         if track:
             self.status_label.setText(f"Выбран трек: {track.singer} — {track.title}")
 
-    def run_practice(self, track_id: Optional[int] = None):
+    def run_practice(self, track_id=None):
         target_id = int(track_id if track_id is not None else self.bottom_bar.track_id())
         try:
             track = self.repository.get_track(target_id)
@@ -1647,34 +1647,29 @@ class ChooseScreen(QMainWindow):
         self.repository.close()
         super().closeEvent(event)
 
-    def _status_text(self) -> str:
+    def status_text(self):
         if not self.visibletracks:
             return "Ничего не найдено. Очисти поиск или измени фильтр."
         if self.current_search or self.filter_panel.complexity_value() is not None:
             return f"Найдено треков: {len(self.visibletracks)}"
         return f"Доступно треков: {len(self.visibletracks)}"
 
-    def _apply_sorting(self, tracks: list[Track]) -> None:
+    def apply_sorting(self, tracks):
         if self.sort_column is None:
-            # Дефолтное состояние окна выбора: ID от меньшего к большему.
-            # Это не мешает дальнейшей сортировке по клику на заголовки.
             tracks.sort(key=lambda track: track.id)
             return
-
-        # Стабильная вторичная сортировка по ID не дает строкам случайно
-        # «прыгать» внутри одинаковых значений выбранного столбца.
         tracks.sort(key=lambda track: track.id)
         tracks.sort(key=self._sort_value(self.sort_column), reverse=not self.sort_ascending)
 
     @staticmethod
-    def _duration_seconds(duration: str) -> int:
+    def _duration_seconds(duration):
         try:
             minutes, seconds = duration.split(":")[:2]
             return int(minutes) * 60 + int(seconds)
         except (ValueError, AttributeError):
             return 0
 
-    def _sort_value(self, column: int):
+    def _sort_value(self, column):
         if column == 1:
             return lambda track: track.title.lower()
         if column == 2:
@@ -1685,12 +1680,8 @@ class ChooseScreen(QMainWindow):
             return lambda track: complexity_rank(track.complexity)
         return lambda track: track.id
 
-
-# ---------- Окно практики ----------
-
 @dataclass
 class PracticeData:
-    """Данные третьей страницы, отделенные от интерфейса."""
 
     song_text: str
     battle_text: str
@@ -1703,7 +1694,6 @@ class PracticeData:
 
 @dataclass(frozen=True)
 class LrcEntry:
-    """Одна строка LRC с временем начала в секундах."""
 
     time_seconds: float
     text: str
@@ -1715,7 +1705,7 @@ class LrcParser:
     TIME_RE = re.compile(r"\[(\d{1,2}):(\d{2})(?:[\.:](\d{1,3}))?\]")
 
     @classmethod
-    def parse_file(cls, path: Path) -> list[LrcEntry]:
+    def parse_file(cls, path):
         text = path.read_text(encoding="utf-8-sig")
         entries: list[LrcEntry] = []
 
@@ -1827,7 +1817,7 @@ class SmallPillButton(QPushButton):
         self.setFont(QFont("Segoe UI", 12, QFont.Weight.DemiBold))
         self.apply_style(False)
 
-    def set_dark_variant(self, enabled: bool) -> None:
+    def set_dark_variant(self, enabled):
         self.dark_variant = bool(enabled)
         self.apply_style(False)
 
@@ -1839,7 +1829,7 @@ class SmallPillButton(QPushButton):
         self.apply_style(False)
         super().leaveEvent(event)
 
-    def apply_style(self, hover: bool):
+    def apply_style(self, hover):
         text_color = TEXT
         if self.dark_variant:
             bg = "rgba(16,18,25,0.94)" if hover else "rgba(8,10,16,0.90)"
@@ -1873,7 +1863,7 @@ class SmallPillButton(QPushButton):
 class RoundControlButton(QPushButton):
     """Круглая кнопка аудиоплеера."""
 
-    def __init__(self, text: str, size: int = 58, primary: bool = False, parent=None):
+    def __init__(self, text, size=58, primary=False, parent=None):
         super().__init__(text, parent)
         self.size_value = size
         self.primary = primary
@@ -1890,7 +1880,7 @@ class RoundControlButton(QPushButton):
         self.apply_style(False)
         super().leaveEvent(event)
 
-    def apply_style(self, hover: bool):
+    def apply_style(self, hover):
         radius = self.size_value // 2
         if self.primary:
             bg = "qradialgradient(cx:0.5, cy:0.5, radius:0.75, stop:0 #FFD18A, stop:0.50 #FF6C4C, stop:1 #B9223D)"
@@ -1914,7 +1904,7 @@ class CoverCard(GlassCard):
     accordsRequested = QtCore.pyqtSignal()
     battleRequested = QtCore.pyqtSignal()
 
-    def __init__(self, song: str, singer: str, image_path: Optional[Path], parent=None):
+    def __init__(self, song, singer, image_path, parent=None):
         super().__init__(parent)
         self.setFixedWidth(490)
         layout = QVBoxLayout(self)
@@ -1943,14 +1933,13 @@ class CoverCard(GlassCard):
         else:
             self.image_label.setText("обложка\nне найдена")
 
-        self.sansara_mode = self._is_sansara_track(song, singer)
+        self.sansara_mode = self.is_sansara_track(song, singer)
 
         self.track_label = QLabel(song)
         self.track_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.track_label.setWordWrap(True)
         self.track_label.setFont(QFont("Georgia", 30, QFont.Weight.Normal))
         if self.sansara_mode:
-            # Для «Сансары» убрана светлая подложка: остается только темный текст.
             self.track_label.setStyleSheet(f"color: {DARK_TEXT}; background: transparent;")
         else:
             self.track_label.setStyleSheet(f"color: {TEXT}; background: transparent;")
@@ -1959,7 +1948,6 @@ class CoverCard(GlassCard):
         self.singer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.singer_label.setFont(QFont("Segoe UI", 14))
         if self.sansara_mode:
-            # Имя исполнителя также без плашки и заливки.
             self.singer_label.setStyleSheet(f"color: {DARK_MUTED}; background: transparent;")
         else:
             self.singer_label.setStyleSheet(f"color: {MUTED}; background: transparent;")
@@ -1982,15 +1970,15 @@ class CoverCard(GlassCard):
         self.battle_button.clicked.connect(self.battleRequested.emit)
 
     @staticmethod
-    def _is_sansara_track(song: str, singer: str = "") -> bool:
+    def is_sansara_track(song, singer=""):
         normalized_song = song.strip().lower().replace("ё", "е")
         normalized_singer = singer.strip().lower().replace("ё", "е")
         return normalized_song == "сансара" and "баста" in normalized_singer
 
-    def set_accords_visible(self, visible: bool) -> None:
+    def set_accords_visible(self, visible):
         self.accords_button.setText("▦   Скрыть аккорды" if visible else "▦   Показать аккорды")
 
-    def set_battle_visible(self, visible: bool) -> None:
+    def set_battle_visible(self, visible):
         self.battle_button.setText("↕   Скрыть бой" if visible else "↕   Показать бой")
         self.battle_button.set_dark_variant(self.sansara_mode and visible)
 
@@ -2005,11 +1993,11 @@ class LyricsPanel(GlassCard):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.lines: list[str] = []
-        self.lrc_entries: list[LrcEntry] = []
-        self.current_line: Optional[int] = None
-        self._scroll_animation: Optional[QPropertyAnimation] = None
-        self._last_scroll_target: Optional[int] = None
+        self.lines = []
+        self.lrc_entries = []
+        self.current_line = None
+        self.scroll_animation = None
+        self.last_scroll_target = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 22, 22, 22)
@@ -2039,35 +2027,35 @@ class LyricsPanel(GlassCard):
         """)
         layout.addWidget(self.editor)
 
-    def set_lyrics(self, text: str) -> None:
-        self._stop_scroll_animation()
+    def set_lyrics(self, text):
+        self.stopscroll_animation()
         self.lrc_entries = []
         self.lines = text.splitlines() or ["Текст песни не найден."]
         self.current_line = None
-        self._last_scroll_target = None
+        self.last_scroll_target = None
         self._render()
 
-    def set_lrc_entries(self, entries: list[LrcEntry]) -> None:
-        self._stop_scroll_animation()
+    def set_lrc_entries(self, entries):
+        self.stopscroll_animation()
         self.lrc_entries = entries
         self.lines = [entry.text if entry.text else " " for entry in entries]
         self.current_line = 0 if self.lines else None
-        self._last_scroll_target = None
+        self.last_scroll_target = None
         self._render(scroll_to_current=True, animated=False)
 
-    def update_by_time(self, seconds: float, *, force: bool = False) -> None:
+    def update_by_time(self, seconds, *, force=False):
         if not self.lrc_entries:
             return
-        index = self._entry_index_for_time(seconds)
+        index = self.entry_index_for_time(seconds)
         if index != self.current_line or force:
             self.current_line = index
             self._render(scroll_to_current=True, animated=True, fast_scroll=force)
 
-    def set_progress(self, progress: float) -> None:
+    def set_progress(self, progress):
         # Без LRC принудительную подсветку по проценту не делаем.
         return
 
-    def _entry_index_for_time(self, seconds: float) -> int:
+    def entry_index_for_time(self, seconds):
         if not self.lrc_entries:
             return 0
         seconds = max(0.0, float(seconds))
@@ -2100,7 +2088,7 @@ class LyricsPanel(GlassCard):
                     f"background:rgba(255,97,72,0.18); border:1px solid rgba(255,118,72,0.28);'>"
                     f"<span style='color:#FFB35C; font-weight:700;'>▶&nbsp;</span>{safe}</div>"
                 )
-            elif self._is_chord_line(line):
+            elif self.is_chord_line(line):
                 html_lines.append(f"<div style='color:#FF8F5A; font-weight:700; margin-top:5px;'>{safe}</div>")
             else:
                 html_lines.append(f"<div style='color:rgba(244,238,232,0.82); margin:3px 0;'>{safe}</div>")
@@ -2114,39 +2102,39 @@ class LyricsPanel(GlassCard):
             line_index = self.current_line
             QtCore.QTimer.singleShot(
                 0,
-                lambda index=line_index: self._scroll_to_line(index, animated=animated, fast=fast_scroll),
+                lambda index=line_index: self.scroll_to_line(index, animated=animated, fast=fast_scroll),
             )
 
-    def _scroll_to_line(self, index: int, animated: bool = True, fast: bool = False) -> None:
+    def scroll_to_line(self, index, animated=True, fast=False):
         scrollbar = self.editor.verticalScrollBar()
         maximum = scrollbar.maximum()
         if maximum <= 0 or not self.lines:
             return
 
         clamped_index = max(0, min(index, len(self.lines) - 1))
-        target = self._line_scroll_target(clamped_index, maximum)
+        target = self.line_scroll_target(clamped_index, maximum)
         current_value = scrollbar.value()
 
         if abs(current_value - target) <= 3:
-            self._last_scroll_target = target
+            self.last_scroll_target = target
             return
-        if self._last_scroll_target == target and self._scroll_animation is not None:
-            if self._scroll_animation.state() == QtCore.QAbstractAnimation.State.Running:
+        if self.last_scroll_target == target and self.scroll_animation is not None:
+            if self.scroll_animation.state() == QtCore.QAbstractAnimation.State.Running:
                 return
 
-        self._last_scroll_target = target
+        self.last_scroll_target = target
         if animated:
-            self._stop_scroll_animation()
-            self._scroll_animation = QPropertyAnimation(scrollbar, b"value", self)
-            self._scroll_animation.setDuration(320 if fast else 560)
-            self._scroll_animation.setStartValue(current_value)
-            self._scroll_animation.setEndValue(target)
-            self._scroll_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-            self._scroll_animation.start()
+            self.stopscroll_animation()
+            self.scroll_animation = QPropertyAnimation(scrollbar, b"value", self)
+            self.scroll_animation.setDuration(320 if fast else 560)
+            self.scroll_animation.setStartValue(current_value)
+            self.scroll_animation.setEndValue(target)
+            self.scroll_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self.scroll_animation.start()
         else:
             scrollbar.setValue(target)
 
-    def _line_scroll_target(self, index: int, maximum: int) -> int:
+    def line_scroll_target(self, index, maximum):
         viewport_height = max(1, self.editor.viewport().height())
         block = self.editor.document().findBlockByNumber(index)
         if block.isValid():
@@ -2159,16 +2147,16 @@ class LyricsPanel(GlassCard):
             target = int(maximum * index / denominator)
         return max(0, min(maximum, target))
 
-    def _stop_scroll_animation(self) -> None:
-        if self._scroll_animation is not None:
-            self._scroll_animation.stop()
+    def stopscroll_animation(self):
+        if self.scroll_animation is not None:
+            self.scroll_animation.stop()
 
-    def _is_chord_line(self, line: str) -> bool:
+    def is_chord_line(self, line):
         stripped = line.strip()
         return bool(stripped) and self.CHORD_LINE_RE.match(stripped).hasMatch()
 
     @staticmethod
-    def _escape(text: str) -> str:
+    def _escape(text):
         return (
             text.replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -2190,11 +2178,9 @@ class ChordDiagramWidget(QWidget):
         "A": {"mute": [6], "open": [1, 5], "dots": [(4, 2), (3, 2), (2, 2)]},
     }
 
-    def __init__(self, chord_name: str, active: bool = False, parent=None):
+    def __init__(self, chord_name, active=False, parent=None):
         super().__init__(parent)
         self.chord_name = chord_name
-        # Автоматическую подсветку первого аккорда убрали: все аккорды
-        # должны отображаться одинаково.
         self.active = False
         self.setFixedSize(116, 122)
         self.setToolTip(chord_name)
@@ -2253,7 +2239,7 @@ class ChordDiagramWidget(QWidget):
             p.drawText(QtCore.QRectF(x - 7, y - 7, 14, 14), Qt.AlignmentFlag.AlignCenter, str(min(number, 4)))
             p.setPen(Qt.PenStyle.NoPen)
 
-    def _fingering(self) -> dict[str, list]:
+    def _fingering(self):
         normalized = self.chord_name.strip().replace("♯", "#")
         if normalized in self.COMMON_FINGERINGS:
             return self.COMMON_FINGERINGS[normalized]
