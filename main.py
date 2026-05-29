@@ -2255,13 +2255,13 @@ class ChordDiagramWidget(QWidget):
 class ChordCarouselPanel(GlassCard):
     """Панель аккордов с перелистыванием."""
 
-    def __init__(self, chord_names: list[str], chord_texts: list[str], parent=None):
+    def __init__(self, chord_names, chord_texts, parent=None):
         super().__init__(parent)
         self.chord_names = chord_names
         self.chord_texts = chord_texts
         self.offset = 0
         self.page_size = 5
-        self.widgets: list[ChordDiagramWidget] = []
+        self.widgets = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 18, 24, 16)
@@ -2300,13 +2300,13 @@ class ChordCarouselPanel(GlassCard):
         self.next_button.clicked.connect(lambda: self.shift(1))
         self.refresh()
 
-    def shift(self, direction: int) -> None:
+    def shift(self, direction):
         if len(self.chord_names) <= self.page_size:
             return
         self.offset = (self.offset + direction) % len(self.chord_names)
         self.refresh()
 
-    def refresh(self) -> None:
+    def refresh(self):
         while self.diagram_box.count():
             item = self.diagram_box.takeAt(0)
             widget = item.widget()
@@ -2328,7 +2328,7 @@ class ChordCarouselPanel(GlassCard):
         self.prev_button.setEnabled(len(self.chord_names) > self.page_size)
         self.next_button.setEnabled(len(self.chord_names) > self.page_size)
 
-    def _visible_names(self) -> list[str]:
+    def _visible_names(self):
         if len(self.chord_names) <= self.page_size:
             return self.chord_names
         doubled = self.chord_names + self.chord_names
@@ -2338,10 +2338,10 @@ class ChordCarouselPanel(GlassCard):
 class BattlePatternWidget(QWidget):
     """Крупная схема боя внутри блока практики."""
 
-    def __init__(self, pattern_text: str, parent=None):
+    def __init__(self, pattern_text, parent=None):
         super().__init__(parent)
         self.pattern_text = pattern_text
-        self.tokens = self._normalize(pattern_text)
+        self.tokens = self.normalize(pattern_text)
         self.plain_text = " ".join(self.tokens)
         self.setMinimumHeight(118)
         self.setMinimumWidth(360)
@@ -2357,7 +2357,7 @@ class BattlePatternWidget(QWidget):
             return
 
         rect = QtCore.QRectF(8, 4, self.width() - 16, self.height() - 8)
-        font_size = self._best_font_size(rect)
+        font_size = self.best_font_size(rect)
         p.setFont(QFont("Segoe UI", font_size, QFont.Weight.DemiBold))
         p.setPen(QColor(244, 238, 232, 238))
         p.drawText(
@@ -2366,7 +2366,7 @@ class BattlePatternWidget(QWidget):
             self.plain_text,
         )
 
-    def _best_font_size(self, rect: QtCore.QRectF) -> int:
+    def best_font_size(self, rect):
         for size in range(58, 25, -2):
             font = QFont("Segoe UI", size, QFont.Weight.DemiBold)
             metrics = QtGui.QFontMetrics(font)
@@ -2379,7 +2379,7 @@ class BattlePatternWidget(QWidget):
                 return size
         return 26
 
-    def _normalize(self, text: str) -> list[str]:
+    def normalize(self, text):
         raw = text.replace("\\n", " ").replace("\n", " ").strip()
         if not raw:
             raw = "↓ ↓ ✱ ↑ ↑ ↓ ✱ ↑"
@@ -2394,7 +2394,7 @@ class BattlePatternWidget(QWidget):
             "u": "↑", "U": "↑", "x": "✱", "X": "✱", "*": "✱", "-": "—",
         }
         battle_symbols = set("↓↑✱—vVdD^uUxX*-")
-        tokens: list[str] = []
+        tokens = []
 
         for part in raw.split():
             normalized = replacements.get(part, part)
@@ -2411,7 +2411,7 @@ class BattlePatternWidget(QWidget):
 class BattlePanel(GlassCard):
     """Блок боя оформлен как отдельный внутренний бокс в стиле аккордов."""
 
-    def __init__(self, pattern_text: str, parent=None):
+    def __init__(self, pattern_text, parent=None):
         super().__init__(parent)
         self.setMinimumHeight(178)
 
@@ -2466,11 +2466,11 @@ class WaveformWidget(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
 
-    def set_progress(self, progress: float) -> None:
+    def set_progress(self, progress):
         self.progress = max(0.0, min(1.0, progress))
         self.update()
 
-    def set_animated(self, animated: bool) -> None:
+    def set_animated(self, animated):
         self._animated = animated
         if animated:
             if not self.timer.isActive():
@@ -2485,19 +2485,19 @@ class WaveformWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self._emit_seek(event.position().x())
+            self.emit_seek(event.position().x())
             event.accept()
             return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.MouseButton.LeftButton:
-            self._emit_seek(event.position().x())
+            self.emit_seek(event.position().x())
             event.accept()
             return
         super().mouseMoveEvent(event)
 
-    def _emit_seek(self, x: float) -> None:
+    def emit_seek(self, x):
         width = max(1, self.width())
         progress = max(0.0, min(1.0, x / width))
         self.set_progress(progress)
@@ -2538,7 +2538,7 @@ class PlayerBar(GlassCard):
     seekRequested = QtCore.pyqtSignal(float)
     volumeChanged = QtCore.pyqtSignal(int)
 
-    def __init__(self, duration: str, parent=None):
+    def __init__(self, duration, parent=None):
         super().__init__(parent)
         self.duration = duration
         self.setFixedHeight(168)
@@ -2601,30 +2601,30 @@ class PlayerBar(GlassCard):
         self.waveform.seekRequested.connect(self.seekRequested.emit)
         self.set_playing(False)
 
-    def set_playing(self, playing: bool) -> None:
+    def set_playing(self, playing):
         self.play_button.setText("⏸" if playing else "▶")
         self.waveform.set_animated(playing)
         self.volume_equalizer.set_animated(playing)
 
-    def set_countdown(self, seconds_left: int) -> None:
+    def set_countdown(self, seconds_left):
         self.play_button.setText(str(seconds_left))
         self.waveform.set_animated(False)
         self.volume_equalizer.set_animated(False)
 
-    def set_time(self, current_text: str, progress: float) -> None:
+    def set_time(self, current_text, progress):
         self.current_time.setText(current_text)
         self.waveform.set_progress(progress)
 
 
 class PracticeScreen(QMainWindow):
 
-    def __init__(self, song_id: str, singer: str, song: str, duration: str = "0:00"):
+    def __init__(self, song_id, singer, song, duration="0:00"):
         super().__init__()
         self.song_id = song_id
         self.singer = singer
         self.song = song
         self.duration = duration
-        self.song_length = self._duration_to_seconds(duration)
+        self.song_length = self.duration_to_seconds(duration)
         self.play = False
         self.start_pos = 0.0
         self.audio_ready = False
@@ -2632,7 +2632,7 @@ class PracticeScreen(QMainWindow):
         self.countdown_remaining = 0
         self.play_countdown_timer = QTimer(self)
         self.play_countdown_timer.setInterval(1000)
-        self.play_countdown_timer.timeout.connect(self._countdowntick)
+        self.play_countdown_timer.timeout.connect(self.countdowntick)
         self.background_music = get_menu_background_music()
         self.background_music.set_context("practice")
 
@@ -2652,10 +2652,10 @@ class PracticeScreen(QMainWindow):
         )
         self.setCentralWidget(self.bg)
         self.build_ui()
-        self._init_audio()
+        self.init_audio()
         self._start_timers()
 
-    def build_ui(self) -> None:
+    def build_ui(self):
         root = QVBoxLayout(self.bg)
         root.setContentsMargins(36, 28, 36, 28)
         root.setSpacing(16)
@@ -2704,7 +2704,7 @@ class PracticeScreen(QMainWindow):
         self.cover_card.set_accords_visible(True)
         self.cover_card.set_battle_visible(True)
 
-    def _load_lrc_or_plain_text(self) -> None:
+    def _load_lrc_or_plain_text(self):
         self.lyrics_panel.set_lyrics(self.data.song_text)
         self.lrc_entries = []
 
@@ -2720,7 +2720,7 @@ class PracticeScreen(QMainWindow):
             self.lyrics_panel.set_lyrics(self.data.song_text)
             print(f"Ошибка чтения LRC-файла {self.data.lrc_path}: {error}")
 
-    def _init_audio(self) -> None:
+    def init_audio(self):
         try:
             if not pg.mixer.get_init():
                 pg.mixer.init(22100)
@@ -2736,24 +2736,24 @@ class PracticeScreen(QMainWindow):
             self.statusBar().showMessage(f"Ошибка аудио: {error}")
             self.audio_ready = False
 
-    def _start_timers(self) -> None:
+    def _start_timers(self):
         self.position_timer = QTimer(self)
         self.position_timer.timeout.connect(self.update_audio_position)
         self.position_timer.start(250)
 
-    def toggle_accords(self) -> None:
+    def toggle_accords(self):
         visible = not self.chords_panel.isVisible()
         self.chords_panel.setVisible(visible)
         self.cover_card.set_accords_visible(visible)
 
-    def toggle_battle(self) -> None:
+    def toggle_battle(self):
         visible = not self.battle_panel.isVisible()
         self.battle_panel.setVisible(visible)
         self.cover_card.set_battle_visible(visible)
 
-    def back_to_choice(self) -> None:
+    def back_to_choice(self):
         if self.countdown_active:
-            self._cancel_play_countdown()
+            self.cancel_play_countdown()
         self.background_music.set_context("choose")
         try:
             pg.mixer.music.stop()
@@ -2763,13 +2763,13 @@ class PracticeScreen(QMainWindow):
         self.next_window.show()
         self.close()
 
-    def pause_play(self) -> None:
+    def pause_play(self):
         if not self.audio_ready:
             self.statusBar().showMessage("Нечего воспроизводить: аудиофайл не загружен", 2500)
             return
 
         if self.countdown_active:
-            self._cancel_play_countdown()
+            self.cancel_play_countdown()
             return
 
         if self.play:
@@ -2781,15 +2781,15 @@ class PracticeScreen(QMainWindow):
                 self.statusBar().showMessage(f"Ошибка паузы: {error}")
             return
 
-        self._start_play_countdown()
+        self.start_play_countdown()
 
-    def _start_play_countdown(self) -> None:
+    def start_play_countdown(self):
         self.countdown_active = True
         self.countdown_remaining = 3
         self.player_bar.set_countdown(self.countdown_remaining)
         self.play_countdown_timer.start()
 
-    def _countdowntick(self) -> None:
+    def countdowntick(self):
         if not self.countdown_active:
             self.play_countdown_timer.stop()
             return
@@ -2810,20 +2810,20 @@ class PracticeScreen(QMainWindow):
             self.player_bar.set_playing(False)
             self.statusBar().showMessage(f"Ошибка воспроизведения: {error}")
 
-    def _cancel_play_countdown(self) -> None:
+    def cancel_play_countdown(self):
         self.play_countdown_timer.stop()
         self.countdown_active = False
         self.countdown_remaining = 0
         self.play = False
         self.player_bar.set_playing(False)
 
-    def seek_to_progress(self, progress: float) -> None:
+    def seek_to_progress(self, progress):
         if not self.audio_ready or not self.song_length:
             return
         target = max(0.0, min(1.0, progress)) * self.song_length
-        self._seek_to(target)
+        self.seek_to(target)
 
-    def _seek_to(self, seconds: float) -> None:
+    def seek_to(self, seconds):
         if not self.audio_ready:
             return
         try:
@@ -2835,23 +2835,23 @@ class PracticeScreen(QMainWindow):
         except pg.error as error:
             self.statusBar().showMessage(f"Ошибка перемотки: {error}")
 
-    def change_volume(self, value: int) -> None:
+    def change_volume(self, value):
         try:
             pg.mixer.music.set_volume(value / 100)
         except pg.error:
             pass
 
-    def plus_time(self) -> None:
+    def plus_time(self):
         self._seek(5)
 
-    def minus_time(self) -> None:
+    def minus_time(self):
         self._seek(-5)
 
-    def restart_audio(self) -> None:
+    def restart_audio(self):
         if not self.audio_ready:
             return
         if self.countdown_active:
-            self._cancel_play_countdown()
+            self.cancel_play_countdown()
         self.start_pos = 0.0
         try:
             pg.mixer.music.play(0, 0.0)
@@ -2861,12 +2861,12 @@ class PracticeScreen(QMainWindow):
         except pg.error as error:
             self.statusBar().showMessage(f"Ошибка перезапуска: {error}")
 
-    def _seek(self, seconds: int) -> None:
+    def _seek(self, seconds):
         if not self.audio_ready:
             return
-        self._seek_to(self.current_seconds() + seconds)
+        self.seek_to(self.current_seconds() + seconds)
 
-    def current_seconds(self) -> float:
+    def current_seconds(self):
         try:
             position = max(0.0, pg.mixer.music.get_pos() / 1000)
         except pg.error:
@@ -2883,7 +2883,7 @@ class PracticeScreen(QMainWindow):
             self.lyrics_panel.update_by_time(current, force=force_lrc)
 
     @staticmethod
-    def _duration_to_seconds(value: str) -> int:
+    def duration_to_seconds(value):
         try:
             minutes, seconds = value.split(":")[:2]
             return int(minutes) * 60 + int(seconds)
@@ -2891,12 +2891,12 @@ class PracticeScreen(QMainWindow):
             return 0
 
     @staticmethod
-    def _seconds_to_time(value: float) -> str:
+    def _seconds_to_time(value):
         value = max(0, int(value))
         return f"{value // 60}:{value % 60:02d}"
 
     @staticmethod
-    def text_edit_style(font_size: int = 15) -> str:
+    def text_edit_style(font_size=15):
         return f"""
             QPlainTextEdit {{
                 color: {TEXT};
@@ -2910,7 +2910,7 @@ class PracticeScreen(QMainWindow):
         """
 
     @staticmethod
-    def slider_style() -> str:
+    def slider_style():
         return f"""
             QSlider::groove:horizontal {{
                 height: 8px;
@@ -2931,7 +2931,6 @@ class PracticeScreen(QMainWindow):
             }}
         """
 
-    # Методы-совместимость со старым вариантом. Они не мешают новой логике.
     def show_battle(self):
         self.battle_panel.setVisible(True)
         self.cover_card.set_battle_visible(True)
